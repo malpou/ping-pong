@@ -9,7 +9,7 @@ from logger import logger
 from networking.binary_protocol import encode_game_state, encode_game_status
 from database.models import GameModel, PlayerModel
 from database.config import SessionLocal, acquire_game_connection, release_game_connection
-from networking.game_update_manager import game_update_manager
+from services.games_update_service import games_update_service
 
 
 class GameRoom:
@@ -40,7 +40,7 @@ class GameRoom:
             self.db.commit()
 
             # Broadcast new game creation
-            asyncio.create_task(game_update_manager.broadcast_new_game(
+            asyncio.create_task(games_update_service.broadcast_new_game(
                 self.db_game.id,
                 self.game_state.state
             ))
@@ -91,7 +91,7 @@ class GameRoom:
         self.db.commit()
 
         # Broadcast player joined update
-        asyncio.create_task(game_update_manager.broadcast_player_joined(
+        asyncio.create_task(games_update_service.broadcast_player_joined(
             self.db_game.id,
             self.game_state.state,
             self.game_state.player_count
@@ -187,7 +187,7 @@ class GameRoom:
         self.game_state.update()
 
         if (self.game_state.left_score, self.game_state.right_score) != previous_score:
-            asyncio.create_task(game_update_manager.broadcast_score_update(
+            asyncio.create_task(games_update_service.broadcast_score_update(
                 uuid.UUID(self.game_id),
                 self.game_state.state,
                 self.game_state.player_count,
@@ -199,7 +199,7 @@ class GameRoom:
             self.db_game.state = self.game_state.state
             self.db_game.winner = self.game_state.winner
 
-            asyncio.create_task(game_update_manager.broadcast_game_over(
+            asyncio.create_task(games_update_service.broadcast_game_over(
                 uuid.UUID(self.game_id),
                 self.game_state.state,
                 self.game_state.player_count,
@@ -263,7 +263,7 @@ class GameRoom:
             release_game_connection()
 
 
-class GameRoomManager:
+class GameRoomService:
     def __init__(self):
         self.rooms: Dict[str, GameRoom] = {}
         self.db = SessionLocal()
@@ -285,4 +285,4 @@ class GameRoomManager:
             logger.info(f"Removing room: {game_id}")
             del self.rooms[game_id]
 
-game_room_manager = GameRoomManager()
+game_room_service = GameRoomService()

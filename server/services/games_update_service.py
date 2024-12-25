@@ -6,7 +6,7 @@ from domain.game import Game
 from networking.binary_protocol import GameUpdateType, encode_game_update
 import uuid
 
-class GameUpdateManager:
+class GamesUpdateService:
     def __init__(self):
         self._subscribers: Set[WebSocket] = set()
         self._lock = asyncio.Lock()
@@ -54,4 +54,4 @@ class GameUpdateManager:
                                   player_count)
         await self._broadcast_bytes(data)
 
-game_update_manager = GameUpdateManager()
+games_update_service = GamesUpdateService()

@@ -10,8 +10,8 @@ from sqlalchemy import or_
 from database.config import get_db
 from database.models import GameModel
 from domain.ball import Ball
+from domain.game import Game
 from domain.paddle import Paddle
-from networking.game_room_manager import Game
 
 endpoints = APIRouter()
 
