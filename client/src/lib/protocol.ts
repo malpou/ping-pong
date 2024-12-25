@@ -136,14 +136,6 @@ export class PongClient {
     this.onGameStatus?.(status);
   }
 
-  private storeGameId(gameId: string) {
-    localStorage.setItem('currentGameId', gameId);
-  }
-
-  private getStoredGameId(): string | null {
-    return localStorage.getItem('currentGameId');
-  }
-
   private clearStoredGameId() {
     localStorage.removeItem('currentGameId');
   }
