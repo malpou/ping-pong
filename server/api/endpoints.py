@@ -1,11 +1,11 @@
 import uuid
-from typing import Dict, List
 from datetime import datetime, timedelta, UTC
+from typing import Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from database.config import get_db
 from database.models import GameModel
@@ -28,18 +28,16 @@ class GameInfo(BaseModel):
     class Config:
         from_attributes = True
 
+
 @endpoints.get("/games", response_model=List[GameInfo])
 async def get_games(request: Request, db: Session = Depends(get_db)) -> List[GameInfo]:
-    """Get all current games and games finished within last 30 minutes."""
-    thirty_minutes_ago = datetime.now(UTC) - timedelta(minutes=30)
-    
-    # Query for:
-    # 1. All games in non-finished states (WAITING, PLAYING, PAUSED)
-    # 2. Finished games (GAME_OVER) from last 30 minutes
+    """Get all current games and games finished within last 5 minutes."""
+    five_minutes_ago = datetime.now(UTC) - timedelta(minutes=5)
+
     games = db.query(GameModel).filter(
         or_(
-            GameModel.state != Game.State.GAME_OVER,  # All non-finished games
-            GameModel.updated_at >= thirty_minutes_ago  # Recent finished games
+            GameModel.state != Game.State.GAME_OVER,
+            GameModel.updated_at >= five_minutes_ago
         )
     ).order_by(GameModel.created_at.desc()).all()
 
@@ -47,7 +45,7 @@ async def get_games(request: Request, db: Session = Depends(get_db)) -> List[Gam
         GameInfo(
             id=game.id,
             state=Game.State(game.state),
-            player_count=len(game.players) if game.players is not None else 0,
+            player_count=game.total_connected,  # Use property
             left_score=game.left_score,
             right_score=game.right_score,
             winner=game.winner,

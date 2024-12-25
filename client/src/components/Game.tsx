@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import p5 from 'p5';
 import { PongClient, GameState, GameSpecs } from '../lib/protocol';
 
@@ -8,79 +8,104 @@ interface GameProps {
   specs: GameSpecs;
   serverUrl: string;
   onExit: () => void;
+  onError: (message: string) => void;
+  onGameCreated: (gameId: string) => void;
 }
 
-export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps) {
+export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, onGameCreated }: GameProps) {
   const [status, setStatus] = useState<string>('Connecting...');
-  const [, setConnected] = useState(false);
   const clientRef = useRef<PongClient | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gameStateRef = useRef<GameState | null>(null);
   const p5InstanceRef = useRef<p5 | null>(null);
   const keysPressed = useRef<Set<string>>(new Set());
 
-  // Calculate optimal canvas size based on container and desired aspect ratio
-  const calculateCanvasSize = () => {
+  const calculateCanvasSize = useCallback(() => {
     if (!containerRef.current) return { width: 0, height: 0 };
-
     const container = containerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
     const aspectRatio = specs.game.bounds.width / specs.game.bounds.height;
-
-    let width = containerWidth;
-    let height = containerWidth / aspectRatio;
-
-    // If height is too tall for container, scale down based on height
-    if (height > containerHeight) {
-      height = containerHeight;
+    let width = container.clientWidth;
+    let height = width / aspectRatio;
+    if (height > container.clientHeight) {
+      height = container.clientHeight;
       width = height * aspectRatio;
     }
-
     return { width, height };
-  };
+  }, [specs]);
 
+  // Handle game status updates
+  const handleGameStatus = useCallback((newStatus: string) => {
+    switch (newStatus) {
+      case 'waiting_for_players':
+        setStatus('Waiting for opponent...');
+        break;
+      case 'game_starting':
+        setStatus('Game starting in 3...');
+        break;
+      case 'game_in_progress':
+        setStatus('Game in progress');
+        break;
+      case 'game_paused':
+        setStatus('Game paused - waiting for player');
+        break;
+      case 'game_over_left':
+        setStatus('Game Over - Left player wins!');
+        break;
+      case 'game_over_right':
+        setStatus('Game Over - Right player wins!');
+        break;
+      default:
+        setStatus(newStatus);
+    }
+  }, []);
+
+  // WebSocket connection
   useEffect(() => {
+    let isSubscribed = true;
+
     const client = new PongClient(serverUrl, gameId, playerName);
     clientRef.current = client;
 
     client.onConnect = () => {
-      setConnected(true);
+      if (!isSubscribed) return;
       setStatus('Connected');
     };
 
+    client.onConnectError = (error) => {
+      if (!isSubscribed) return;
+      onError(error);
+    };
+
     client.onDisconnect = () => {
-      setConnected(false);
+      if (!isSubscribed) return;
       setStatus('Disconnected');
+      onError('Connection lost');
+    };
+
+    client.onGameId = (newGameId) => {
+      if (!isSubscribed) return;
+      if (!gameId) onGameCreated(newGameId);
     };
 
     client.onGameStatus = (newStatus) => {
-      switch (newStatus) {
-        case 'waiting_for_players':
-          setStatus('Waiting for opponent...');
-          break;
-        case 'game_starting':
-          setStatus('Game starting!');
-          break;
-        case 'game_paused':
-          setStatus('Game paused - waiting for player');
-          break;
-        case 'game_over_left':
-          setStatus('Game Over - Left player wins!');
-          break;
-        case 'game_over_right':
-          setStatus('Game Over - Right player wins!');
-          break;
-        default:
-          setStatus(newStatus);
-      }
+      if (!isSubscribed) return;
+      handleGameStatus(newStatus);
     };
 
     client.onGameState = (state) => {
+      if (!isSubscribed) return;
       gameStateRef.current = state;
     };
 
-    // Initialize p5.js sketch
+    return () => {
+      isSubscribed = false;
+      client.close();
+      clientRef.current = null;
+    };
+  }, [serverUrl, gameId, playerName, onError, onGameCreated, handleGameStatus]);
+
+  // p5.js setup and game rendering
+  useEffect(() => {
     const sketch = (p: p5) => {
       p.setup = () => {
         const { width, height } = calculateCanvasSize();
@@ -89,18 +114,16 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
 
       p.draw = () => {
         p.background(0);
-
         const state = gameStateRef.current;
         if (!state) return;
 
-        // Calculate scaling factors
         const scaleX = p.width;
         const scaleY = p.height;
 
         // Draw center line
         p.stroke(255, 255, 255, 100);
-        p.strokeWeight(Math.max(1, p.width * 0.002)); // Scale stroke weight
-        for (let y = 0; y < p.height; y += p.height * 0.05) { // Scale gap size
+        p.strokeWeight(Math.max(1, p.width * 0.002));
+        for (let y = 0; y < p.height; y += p.height * 0.05) {
           p.line(p.width / 2, y, p.width / 2, y + p.height * 0.025);
         }
 
@@ -136,18 +159,18 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
         );
 
         // Draw score
-        const fontSize = Math.max(16, Math.min(48, p.width * 0.05)); // Responsive font size
+        const fontSize = Math.max(16, Math.min(48, p.width * 0.05));
         p.textSize(fontSize);
         p.textAlign(p.CENTER, p.CENTER);
         p.text(state.score.left.toString(), p.width * 0.25, fontSize * 1.5);
         p.text(state.score.right.toString(), p.width * 0.75, fontSize * 1.5);
 
-        // Handle keyboard input with corrected paddle movement
+        // Handle keyboard input
         if (keysPressed.current.has('ArrowUp')) {
-          clientRef.current?.sendPaddleDown(); // Inverted command
+          clientRef.current?.sendPaddleDown();
         }
         if (keysPressed.current.has('ArrowDown')) {
-          clientRef.current?.sendPaddleUp(); // Inverted command
+          clientRef.current?.sendPaddleUp();
         }
       };
 
@@ -157,12 +180,19 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
       };
     };
 
-    // Create p5 instance
     if (containerRef.current) {
       p5InstanceRef.current = new p5(sketch, containerRef.current);
     }
 
-    // Keyboard event listeners
+    return () => {
+      if (p5InstanceRef.current) {
+        p5InstanceRef.current.remove();
+      }
+    };
+  }, [specs, calculateCanvasSize]);
+
+  // Keyboard controls
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -180,7 +210,14 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
-    // Add resize observer for container size changes
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Resize observer
+  useEffect(() => {
     const resizeObserver = new ResizeObserver(() => {
       if (p5InstanceRef.current) {
         const { width, height } = calculateCanvasSize();
@@ -192,16 +229,8 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
       resizeObserver.observe(containerRef.current);
     }
 
-    return () => {
-      client.close();
-      if (p5InstanceRef.current) {
-        p5InstanceRef.current.remove();
-      }
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      resizeObserver.disconnect();
-    };
-  }, [gameId, playerName, serverUrl, specs]);
+    return () => resizeObserver.disconnect();
+  }, [calculateCanvasSize]);
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col p-4">
