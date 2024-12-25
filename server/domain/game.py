@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
+from scipy import interpolate
 
 import numpy as np
 
@@ -15,6 +16,10 @@ class Game:
         PLAYING = "playing"
         PAUSED = "paused"
         GAME_OVER = "game_over"
+    
+    class Side(Enum):
+        LEFT = "left"
+        RIGHT = "right"
 
     POINTS_TO_WIN = 5  # Configurable win condition
     LEFT_PADDLE_X = 0.05  # X position for left paddle collision
@@ -31,6 +36,7 @@ class Game:
     room_id: str | None = None
     state: State = field(default=State.WAITING)
     player_count: int = 0
+    ball_towards: Side = Side.LEFT
 
     def update(self) -> None:
         if self.winner or self.state != self.State.PLAYING or self.player_count < 2:
@@ -50,22 +56,48 @@ class Game:
             self.ball.reset()
             self._check_winner()
 
+        # Find in which direction the ball is going towards
+        self.ball_towards = self.determine_ball_towards()
+
         # Basic paddle collision
         if (
             (self.left_paddle.is_on_paddle(self.ball)) and 
-             (np.pi / 2 <= np.mod(self.ball.angle, 2 * np.pi) <= 3 * np.pi / 2) 
+            self.ball_towards == self.Side.LEFT
         ):
-            self.ball.angle += 3 * np.pi / 4
+            self.ball.angle = self.calc_angle(self.left_paddle)
 
         if (
             (self.right_paddle.is_on_paddle(self.ball)) and 
-            (
-                (np.mod(self.ball.angle, 2 * np.pi) <= (np.pi / 2)) or 
-                (np.mod(self.ball.angle, 2 * np.pi) >= (3 * np.pi / 2))
-            )
+            self.ball_towards == self.Side.RIGHT
         ):
-            self.ball.angle += 3 * np.pi / 4
+            self.ball.angle = self.calc_angle(self.right_paddle)
 
+    def determine_ball_towards(self) -> Side :
+        if (np.pi / 2 <= np.mod(self.ball.angle, 2 * np.pi) <= 3 * np.pi / 2):
+            return self.Side.LEFT
+        if (
+            (np.mod(self.ball.angle, 2 * np.pi) <= (np.pi / 2)) or 
+            (np.mod(self.ball.angle, 2 * np.pi) >= (3 * np.pi / 2))
+        ):
+            return self.Side.RIGHT
+
+    def calc_angle(self, paddle: Paddle) -> float:
+        if self.ball_towards == self.Side.LEFT:
+            angle_min = -np.pi / 3
+            angle_max = np.pi / 3
+        else:
+            angle_min = 4 * np.pi / 3
+            angle_max = 2 * np.pi / 3
+
+        y_values = [paddle.y_min, paddle.y_max]
+        angle_values = [angle_min, angle_max]
+
+        # Scipy interpolation function 
+        f = interpolate.interp1d(y_values, angle_values)
+
+        angle_interpolated = f(self.ball.y)
+
+        return angle_interpolated
 
     def add_player(self) -> None:
         self.player_count += 1
