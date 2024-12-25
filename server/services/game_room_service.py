@@ -123,7 +123,7 @@ class GameRoom:
         logger.info(f"Room {self.game_id}: Player {player_name} connected as {role}")
 
         # Handle game start if room full
-        if connected_players + 1 == 2:
+        if connected_players + 1 >= 2:
             if not acquire_game_connection():
                 self.disconnect(websocket)
                 raise HTTPException(status_code=503, detail="Server at capacity")

@@ -22,7 +22,9 @@ class Paddle:
         return False
 
     def move_up(self) -> None:
-        self.y_position = min(1.0 - self.height, self.y_position + self.speed)
+        new_y = self.y_position - self.speed
+        self.y_position = max(self.height / 2, new_y)
 
     def move_down(self) -> None:
-        self.y_position = max(0.0, self.y_position - self.speed)
+        new_y = self.y_position + self.speed
+        self.y_position = min(1.0 - self.height / 2, new_y)
