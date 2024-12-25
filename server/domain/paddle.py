@@ -6,7 +6,7 @@ from domain.ball import Ball
 @dataclass
 class Paddle:
     x_position: float
-    y_position: float = 0.6  # Position as percentage of screen height (0-1)
+    y_position: float = 0.5  # Position as percentage of screen height (0-1)
     height: float = 0.2  # Height as percentage of screen height
     width: float = 0.02 # Width of the paddle
     speed: float = 0.02  # Movement speed per frame
