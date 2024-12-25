@@ -20,6 +20,7 @@ class GameRoom:
         self.game_state.room_id = game_id
         self.players: Set[WebSocket] = set()
         self.player_roles: Dict[WebSocket, str] = {}
+        self.player_names: Dict[WebSocket, str] = {}  # Store player names
         self.game_id = game_id
         self.db = db
         self._save_task: Optional[asyncio.Task] = None
@@ -56,15 +57,25 @@ class GameRoom:
             self.game_state.right_score = int(str(self.db_game.right_score))
             self.game_state.winner = str(self.db_game.winner) if self.db_game.winner else None
 
-    async def connect(self, websocket: WebSocket) -> Optional[str]:
+    async def connect(self, websocket: WebSocket, player_name: str) -> Optional[str]:
+        """Connect a player to the game room.
+
+        Args:
+            websocket: The WebSocket connection
+            player_name: The name of the player
+
+        Returns:
+            Optional[str]: The role assigned to the player ('left' or 'right') or None if room is full
+        """
         if len(self.players) >= 2:
             logger.warning(f"Room {self.game_id}: Connection rejected - room is full")
             return None
 
-        await websocket.accept()
+        # Add player to game
         self.players.add(websocket)
         role = 'left' if len(self.players) == 1 else 'right'
         self.player_roles[websocket] = role
+        self.player_names[websocket] = player_name
 
         # Update game state
         self.game_state.add_player()
@@ -72,6 +83,7 @@ class GameRoom:
         # Add player to database
         player = PlayerModel(
             game_id=self.db_game.id,
+            name=player_name,
             role=role,
             connected=True
         )
@@ -85,7 +97,8 @@ class GameRoom:
             self.game_state.player_count
         ))
 
-        logger.info(f"Room {self.game_id}: Player connected as {role} ({self.game_state.player_count}/2 players)")
+        logger.info(
+            f"Room {self.game_id}: Player {player_name} connected as {role} ({self.game_state.player_count}/2 players)")
 
         if self.game_state.player_count == 2:
             if not acquire_game_connection():
@@ -136,8 +149,11 @@ class GameRoom:
     def disconnect(self, websocket: WebSocket) -> None:
         if websocket in self.players:
             role = self.player_roles[websocket]
+            player_name = self.player_names.get(websocket, "Unknown")
             self.players.remove(websocket)
             del self.player_roles[websocket]
+            if websocket in self.player_names:
+                del self.player_names[websocket]
 
             # Update game state
             self.game_state.remove_player()
@@ -151,7 +167,7 @@ class GameRoom:
                 player.connected = False
                 self.db.commit()
 
-            logger.info(f"Room {self.game_id}: {role} player disconnected ({self.game_state.player_count}/2 players)")
+            logger.info(f"Room {self.game_id}: Player {player_name} ({role}) disconnected ({self.game_state.player_count}/2 players)")
 
             if self.game_state.state == Game.State.PAUSED:
                 self.db_game.state = self.game_state.state

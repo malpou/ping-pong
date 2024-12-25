@@ -1,27 +1,69 @@
 import struct
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, Query, HTTPException
+from domain.game import Game
 from logger import logger
 from networking.binary_protocol import decode_command, CommandType
-from networking.game_room_manager import Game
 import asyncio
+import uuid
 
 CONNECTION_TIMEOUT = 60  # Connection timeout in seconds
 VALID_COMMANDS = {0x01, 0x02}  # Only paddle up/down commands are valid
 
-async def handle_game_connection(websocket: WebSocket, room_id: str, room_manager):
-    """Handle WebSocket connection for a game room."""
-    room = await room_manager.create_room(room_id)  # Add await here
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite dev server default port
+    "https://ping.malpou.io",  # Production domain
+]
+
+
+async def handle_game_connection(
+        websocket: WebSocket,
+        player_name: str = Query(None),
+        room_id: str | None = Query(None),
+        room_manager=None
+):
+    """Handle WebSocket connection for a game room.
+    If room_id is None, creates a new game. Otherwise joins existing game.
+
+    Raises:
+        HTTPException(400): If player_name is not provided
+        HTTPException(404): If trying to join a non-existent game
+    """
+    # Handle CORS for WebSocket
+    client_origin = websocket.headers.get('origin')
+    if client_origin not in ALLOWED_ORIGINS:
+        await websocket.close(code=1003, reason="Origin not allowed")
+        return
+
+    # Accept the WebSocket connection before any other processing
+    await websocket.accept()
+
+    # Validate player name
+    if not player_name:
+        await websocket.close(code=1000, reason="Player name is required")
+        raise HTTPException(status_code=400, detail="Player name is required")
+
+    if not room_id:
+        # Create new game with random UUID
+        room_id = str(uuid.uuid4())
+    else:
+        # Verify the room exists
+        existing_room = room_manager.get_room(room_id)
+        if not existing_room:
+            await websocket.close(code=1000, reason="Game room not found")
+            raise HTTPException(status_code=404, detail="Game room not found")
+
+    room = await room_manager.create_room(room_id)
     player_role = None
 
     try:
         async with asyncio.timeout(CONNECTION_TIMEOUT):
-            player_role = await room.connect(websocket)
+            player_role = await room.connect(websocket, player_name)
 
         if not player_role:
             await websocket.close(code=1000, reason="Room is full")
             return
 
-        # Check game state using room.game_state instead of room.state
+        # Main game loop
         while True:
             try:
                 async with asyncio.timeout(CONNECTION_TIMEOUT):
@@ -56,6 +98,7 @@ async def handle_game_connection(websocket: WebSocket, room_id: str, room_manage
                         except Exception as e:
                             logger.error(f"Unexpected error processing command: {e}")
                             continue
+
             except asyncio.TimeoutError:
                 logger.warning("Connection timed out")
                 break
