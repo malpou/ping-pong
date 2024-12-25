@@ -1,25 +1,60 @@
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { GameList } from './components/GameList';
 import { fetchGameSpecs, GameSpecs } from './lib/protocol';
 import { Game } from './components/Game';
-import './index.css'
+import './index.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'localhost:8000';
 
-export default function App() {
-  const [playerName, setPlayerName] = useState(localStorage.getItem('playerName') || '');
-  const [gameSpecs, setGameSpecs] = useState<GameSpecs | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [gameState, setGameState] = useState<{
-    id: string | null;
-    isCreating: boolean;
-  }>({ id: null, isCreating: false });
+function GameWrapper() {
+  const navigate = useNavigate();
+  const { gameId } = useParams();
+  const playerName = localStorage.getItem('playerName');
+  const [specs, setSpecs] = useState<GameSpecs | null>(null);
 
   useEffect(() => {
-    if (playerName) {
-      localStorage.setItem('playerName', playerName);
+    if (!playerName) {
+      navigate('/');
+      return;
     }
-  }, [playerName]);
+
+    const loadSpecs = async () => {
+      try {
+        const specs = await fetchGameSpecs(SERVER_URL);
+        setSpecs(specs);
+      } catch (err) {
+        navigate('/', { state: { error: 'Failed to load game specifications' } });
+      }
+    };
+    loadSpecs();
+  }, [navigate, playerName]);
+
+  if (!specs || !playerName) return null;
+
+  return (
+    <Game
+      playerName={playerName}
+      gameId={gameId || null}
+      specs={specs}
+      serverUrl={SERVER_URL}
+      onExit={() => navigate('/')}
+      onError={(message) => {
+        navigate('/', { state: { error: message } });
+      }}
+      onGameCreated={(newGameId) => {
+        navigate(`/game/${newGameId}`);
+      }}
+    />
+  );
+}
+
+function MainMenu() {
+  const navigate = useNavigate();
+  const [playerName, setPlayerName] = useState(localStorage.getItem('playerName') || '');
+  const [gameSpecs, setGameSpecs] = useState<GameSpecs | null>(null);
+  const { state } = useLocation();
+  const [error, setError] = useState<string | null>(state?.error || null);
 
   useEffect(() => {
     const loadSpecs = async () => {
@@ -32,18 +67,6 @@ export default function App() {
     };
     loadSpecs();
   }, []);
-
-  const handleExitGame = () => {
-    setGameState({ id: null, isCreating: false });
-  };
-
-  const handleJoinGame = (gameId: string) => {
-    setGameState({ id: gameId, isCreating: false });
-  };
-
-  const handleCreateGame = () => {
-    setGameState({ id: null, isCreating: true });
-  };
 
   if (!gameSpecs) {
     return (
@@ -65,6 +88,7 @@ export default function App() {
             const formData = new FormData(e.currentTarget);
             const name = formData.get('name') as string;
             if (name.trim()) {
+              localStorage.setItem('playerName', name.trim());
               setPlayerName(name.trim());
             }
           }}>
@@ -87,27 +111,21 @@ export default function App() {
     );
   }
 
-  // In game or creating game
-  if (gameState.id || gameState.isCreating) {
-    return (
-      <Game
-        playerName={playerName}
-        gameId={gameState.isCreating ? null : gameState.id}
-        specs={gameSpecs}
-        serverUrl={SERVER_URL}
-        onExit={handleExitGame}
-      />
-    );
-  }
-
-  // Game list view
   return (
     <div className="min-h-screen bg-gray-900 p-8">
       <div className="max-w-4xl mx-auto">
+        {error && (
+          <div className="bg-red-600 text-white p-4 rounded mb-4">
+            {error}
+          </div>
+        )}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl text-white">Welcome, {playerName}!</h1>
           <button
-            onClick={() => setPlayerName('')}
+            onClick={() => {
+              localStorage.removeItem('playerName');
+              setPlayerName('');
+            }}
             className="text-gray-400 hover:text-white"
           >
             Change Name
@@ -115,10 +133,23 @@ export default function App() {
         </div>
         <GameList
           serverUrl={SERVER_URL}
-          onJoinGame={handleJoinGame}
-          onCreateGame={handleCreateGame}
+          onJoinGame={(gameId) => navigate(`/game/${gameId}`)}
+          onCreateGame={() => navigate('/game')}
         />
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/game" element={<GameWrapper />} />
+        <Route path="/game/:gameId" element={<GameWrapper />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }
