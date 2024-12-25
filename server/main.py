@@ -8,9 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from logger import logger
 from api.endpoints import endpoints
 from api.websockets import handle_game_connection
-
-from networking.game_room_manager import game_room_manager
-from networking.game_update_manager import game_update_manager
+from services.game_room_service import game_room_service
 
 
 class GameLoop:
@@ -21,7 +19,7 @@ class GameLoop:
         """Run the game loop until shutdown event is set."""
         while not self.shutdown_event.is_set():
             try:
-                for room in list(game_room_manager.rooms.values()):
+                for room in list(game_room_service.rooms.values()):
                     if room.players:
                         try:
                             room.game_state.update()
@@ -38,14 +36,14 @@ class GameLoop:
         logger.info("Application shutting down...")
         self.shutdown_event.set()
 
-        for room_id in list(game_room_manager.rooms.keys()):
-            room = game_room_manager.rooms[room_id]
+        for room_id in list(game_room_service.rooms.keys()):
+            room = game_room_service.rooms[room_id]
             for player in list(room.players):
                 try:
                     await player.close(code=1000, reason="Server shutting down")
                 except Exception as e:
                     logger.error(f"Error closing WebSocket connection in room {room_id}: {e}")
-            game_room_manager.remove_room(room_id)
+            game_room_service.remove_room(room_id)
 
 
 game_loop = GameLoop()
@@ -102,7 +100,7 @@ async def websocket_endpoint(
         HTTPException(404): If trying to join a non-existent game
     """
     try:
-        await handle_game_connection(websocket, player_name, room_id, game_room_manager)
+        await handle_game_connection(websocket, player_name, room_id, game_room_service)
     except HTTPException as e:
         # Log the error and let the websocket close handle the rest
         logger.error(f"HTTP Error in websocket connection: {e.detail}")
@@ -113,7 +111,7 @@ async def websocket_endpoint(
 async def game_updates_endpoint(websocket: WebSocket):
     """WebSocket endpoint for receiving game updates."""
     try:
-        await game_update_manager.connect(websocket)
+        await game_room_service.connect(websocket)
         while True:
             try:
                 # Keep the connection alive and check for client disconnection
@@ -123,4 +121,4 @@ async def game_updates_endpoint(websocket: WebSocket):
             except Exception as _:
                 break
     finally:
-        await game_update_manager.disconnect(websocket)
+        await game_room_service.disconnect(websocket)
