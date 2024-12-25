@@ -107,9 +107,9 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
         // Draw paddles
         p.noStroke();
         p.fill(255);
-        const paddleWidth = p.width * 0.02;
+        const paddleWidth = p.width * specs.paddle.width;
         const paddleHeight = p.height * specs.paddle.height;
-
+  
         // Left paddle
         p.rect(
           p.width * specs.paddle.collision_bounds.left - paddleWidth / 2,

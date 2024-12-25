@@ -51,12 +51,19 @@ class Game:
             self._check_winner()
 
         # Basic paddle collision
-        if self.left_paddle.is_on_paddle(self.ball):
-            self.ball.x = self.left_paddle.x_position
+        if (
+            (self.left_paddle.is_on_paddle(self.ball)) and 
+             (np.pi / 2 <= np.mod(self.ball.angle, 2 * np.pi) <= 3 * np.pi / 2) 
+        ):
             self.ball.angle += 3 * np.pi / 4
 
-        if self.right_paddle.is_on_paddle(self.ball):
-            self.ball.x = self.right_paddle.x_position
+        if (
+            (self.right_paddle.is_on_paddle(self.ball)) and 
+            (
+                (np.mod(self.ball.angle, 2 * np.pi) <= (np.pi / 2)) or 
+                (np.mod(self.ball.angle, 2 * np.pi) >= (3 * np.pi / 2))
+            )
+        ):
             self.ball.angle += 3 * np.pi / 4
 
 
