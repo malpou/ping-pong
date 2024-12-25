@@ -46,9 +46,13 @@ export interface GameSpecs {
 
 export class PongClient {
   private ws: WebSocket;
+  private heartbeatInterval: number | null = null;
+
   onGameState?: (state: GameState) => void;
   onGameStatus?: (status: string) => void;
+  onGameId?: (gameId: string) => void;
   onConnect?: () => void;
+  onConnectError?: (error: string) => void;
   onDisconnect?: () => void;
 
   constructor(server: string, roomId: string | null, playerName: string) {
@@ -60,14 +64,40 @@ export class PongClient {
 
     const { ws: protocol } = getProtocols(server);
     const wsUrl = `${protocol}://${server}/game?${params.toString()}`;
+    
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = 'arraybuffer';
     this.setupHandlers();
+    this.startHeartbeat();
   }
+
+  private startHeartbeat() {
+    this.heartbeatInterval = window.setInterval(() => {
+        if (this.ws.readyState === WebSocket.OPEN) {
+            const heartbeat = new Uint8Array([0x00]);
+            this.ws.send(heartbeat);
+        }
+    }, 1000);  // Send heartbeat every second
+}
 
   private setupHandlers() {
     this.ws.onopen = () => this.onConnect?.();
-    this.ws.onclose = () => this.onDisconnect?.();
+    
+    this.ws.onerror = () => {
+      this.onConnectError?.('Failed to connect to game server');
+    };
+    
+    this.ws.onclose = (event) => {
+      if (event.code === 1000) {
+        if (event.reason === "Game room not found") {
+          this.onConnectError?.('Game not found');
+        } else if (event.reason === "Room is full") {
+          this.onConnectError?.('Game is full');
+        }
+      }
+      this.onDisconnect?.();
+    };
+
     this.ws.onmessage = (event) => {
       const data = new DataView(event.data);
       const messageType = data.getUint8(0);
@@ -79,8 +109,43 @@ export class PongClient {
         case 0x02: // Game Status
           this.handleGameStatus(data);
           break;
+        case 0x03: // Game ID
+          this.handleGameId(data);
+          break;
       }
     };
+  }
+
+  private handleGameId(data: DataView) {
+    const length = data.getUint8(1);
+    const decoder = new TextDecoder();
+    const gameId = decoder.decode(new Uint8Array(data.buffer, 2, length));
+    this.onGameId?.(gameId);
+  }
+
+  private handleGameStatus(data: DataView) {
+    const length = data.getUint8(1);
+    const decoder = new TextDecoder();
+    const status = decoder.decode(new Uint8Array(data.buffer, 2, length));
+    
+    // Check if game is over
+    if (status.startsWith('game_over')) {
+      this.clearStoredGameId();
+    }
+    
+    this.onGameStatus?.(status);
+  }
+
+  private storeGameId(gameId: string) {
+    localStorage.setItem('currentGameId', gameId);
+  }
+
+  private getStoredGameId(): string | null {
+    return localStorage.getItem('currentGameId');
+  }
+
+  private clearStoredGameId() {
+    localStorage.removeItem('currentGameId');
   }
 
   private handleGameState(data: DataView) {
@@ -109,13 +174,6 @@ export class PongClient {
     this.onGameState?.(gameState);
   }
 
-  private handleGameStatus(data: DataView) {
-    const length = data.getUint8(1);
-    const decoder = new TextDecoder();
-    const status = decoder.decode(new Uint8Array(data.buffer, 2, length));
-    this.onGameStatus?.(status);
-  }
-
   public sendPaddleUp() {
     if (this.ws.readyState === WebSocket.OPEN) {
       const command = new Uint8Array([0x01]);
@@ -131,8 +189,11 @@ export class PongClient {
   }
 
   public close() {
+    if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+    }
     this.ws.close();
-  }
+}
 }
 
 export async function fetchGameSpecs(server: string): Promise<GameSpecs> {

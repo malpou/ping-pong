@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Enum as SQLEnum, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database.config import Base
@@ -24,6 +24,10 @@ class GameModel(Base):
     left_paddle_y = Column(Float, default=0.5)
     right_paddle_y = Column(Float, default=0.5)
 
+    @property
+    def total_connected(self):
+        return len([p for p in self.players if p.connected])
+
     # Relationships
     players = relationship("PlayerModel", back_populates="game")
 
@@ -35,7 +39,7 @@ class PlayerModel(Base):
     game_id = Column(UUID(as_uuid=True), ForeignKey("games.id"))
     name = Column(String, nullable=False)  # Player's name
     role = Column(String)  # 'left' or 'right'
-    connected = Column(Integer, default=True)
+    connected = Column(Boolean, default=True)
     joined_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationship

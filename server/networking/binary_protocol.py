@@ -7,12 +7,14 @@ from domain.game import Game
 
 
 class CommandType(IntEnum):
+    HEARTBEAT = 0
     PADDLE_UP = 1
     PADDLE_DOWN = 2
 
 class MessageType(IntEnum):
     GAME_STATE = 1
     GAME_STATUS = 2
+    GAME_ID = 3
 
 class GameUpdateType(IntEnum):
     NEW_GAME = 1
@@ -87,3 +89,12 @@ def encode_game_state(ball_x: float, ball_y: float,
                 left_paddle_y, right_paddle_y,
                 left_score, right_score,
                 winner_code)
+
+
+def encode_game_id(game_id: str) -> bytes:
+    """Encode game ID message."""
+    game_id_bytes = game_id.encode('utf-8')
+    return pack(f'!BB{len(game_id_bytes)}s',
+               MessageType.GAME_ID,
+               len(game_id_bytes),
+               game_id_bytes)

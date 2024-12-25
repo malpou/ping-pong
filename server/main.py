@@ -4,6 +4,7 @@ import subprocess
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.websockets import WebSocketDisconnect
 
 from logger import logger
 from api.endpoints import endpoints
@@ -16,7 +17,6 @@ class GameLoop:
         self.shutdown_event = asyncio.Event()
 
     async def run(self):
-        """Run the game loop until shutdown event is set."""
         while not self.shutdown_event.is_set():
             try:
                 for room in list(game_room_service.rooms.values()):
@@ -29,10 +29,9 @@ class GameLoop:
                             continue
             except Exception as e:
                 logger.error(f"Error in game loop: {e}")
-            await asyncio.sleep(1 / 60)  # 60 FPS
+            await asyncio.sleep(1 / 60)
 
     async def shutdown(self):
-        """Gracefully shutdown the game loop."""
         logger.info("Application shutting down...")
         self.shutdown_event.set()
 
@@ -70,55 +69,45 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Configure CORS
 origins = [
-    "http://localhost:5173",    # Vite dev server default port
-    "https://ping.malpou.io",   # Production domain
+    "http://localhost:5173",
+    "https://ping.malpou.io",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],        # Allows all methods
-    allow_headers=["*"],        # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(endpoints)
-
-
 @app.websocket("/game")
 async def websocket_endpoint(
         websocket: WebSocket,
         player_name: str | None = None,
         room_id: str | None = None
 ):
-    """WebSocket endpoint for game connections.
-
-    Raises:
-        HTTPException(400): If player_name is not provided
-        HTTPException(404): If trying to join a non-existent game
-    """
+    await websocket.accept()
     try:
         await handle_game_connection(websocket, player_name, room_id, game_room_service)
     except HTTPException as e:
-        # Log the error and let the websocket close handle the rest
-        logger.error(f"HTTP Error in websocket connection: {e.detail}")
-        return
-
+        try:
+            await websocket.close(code=4000, reason=e.detail)
+        except RuntimeError:
+            pass  # WebSocket already closed
 
 @app.websocket("/game-updates")
 async def game_updates_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for receiving game updates."""
+    await websocket.accept()
     try:
-        await game_room_service.connect(websocket)
         while True:
             try:
-                # Keep the connection alive and check for client disconnection
                 message = await websocket.receive_text()
                 if message == "ping":
                     await websocket.send_text("pong")
-            except Exception as _:
+            except WebSocketDisconnect:
                 break
     finally:
         await game_room_service.disconnect(websocket)
