@@ -29,6 +29,7 @@ export interface GameSpecs {
   };
   paddle: {
     height: number;
+    width: number;
     initial: { y: number; };
     collision_bounds: {
       left: number;

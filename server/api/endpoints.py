@@ -71,6 +71,7 @@ def get_game_specs(_: Request) -> Dict:
         },
         "paddle": {
             "height": paddle.height,
+            "width": paddle.width,
             "initial": {
                 "y": paddle.y_position
             },
