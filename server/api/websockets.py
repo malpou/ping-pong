@@ -1,13 +1,15 @@
 import struct
-from fastapi import WebSocket, WebSocketDisconnect, Query, HTTPException
+import uuid
+from fastapi import WebSocket, WebSocketDisconnect, HTTPException
+from sqlalchemy.orm import Session
 from domain.game import Game
 from logger import logger
 from networking.binary_protocol import decode_command, CommandType, encode_game_id
 import asyncio
-import uuid
 
-CONNECTION_TIMEOUT = 60  # Connection timeout in seconds
-VALID_COMMANDS = {0x01, 0x02}  # Only paddle up/down commands are valid
+from services.game_room_service import GameRoom
+
+CONNECTION_TIMEOUT = 60 * 5  # Connection timeout in seconds
 
 ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite dev server default port
@@ -17,9 +19,10 @@ ALLOWED_ORIGINS = [
 
 async def handle_game_connection(
         websocket: WebSocket,
-        player_name: str = Query(None),
-        room_id: str | None = Query(None),
-        room_manager=None
+        player_name: str | None = None,
+        room_id: str | None = None,
+        game_loop=None,
+        db: Session | None = None
 ):
     room = None
     player_role = None
@@ -33,15 +36,15 @@ async def handle_game_connection(
         if not player_name:
             raise HTTPException(status_code=400, detail="Player name is required")
 
-        if room_id:
-            existing_room = room_manager.get_room(room_id)
-            if not existing_room:
-                raise HTTPException(status_code=404, detail="Game room not found")
-
+        # Validate or create room
         if not room_id:
             room_id = str(uuid.uuid4())
 
-        room = await room_manager.create_room(room_id)
+        room = GameRoom(room_id, db)
+
+        if game_loop:
+            game_loop.add_room(room)
+
         player_role = await room.connect(websocket, player_name)
 
         if not player_role:
@@ -59,10 +62,6 @@ async def handle_game_connection(
                 if message["type"] == "websocket.receive" and "bytes" in message:
                     try:
                         command = decode_command(message["bytes"])
-
-                        if command == CommandType.HEARTBEAT:
-                            await room.update_heartbeat(websocket)
-                            continue
 
                         if room.game_state.state != Game.State.PLAYING:
                             continue
@@ -93,5 +92,6 @@ async def handle_game_connection(
     finally:
         if room and player_role:
             room.disconnect(websocket)
-            if not room.players:
-                room_manager.remove_room(room_id)
+            # Remove room if no players
+            if not room.players and game_loop:
+                game_loop.remove_room(room_id)
