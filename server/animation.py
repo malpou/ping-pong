@@ -1,11 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import time 
-
-from matplotlib.animation import FuncAnimation
 
 from domain.game import Game
-
+from matplotlib.animation import FuncAnimation
 
 def show_animation(game: Game, dt):
     fig, ax = plt.subplots()

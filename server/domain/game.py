@@ -56,7 +56,7 @@ class Game:
             self.ball.reset()
             self._check_winner()
 
-        # Find in which direction the ball is going towards
+        # Find which direction the ball is going towards
         self.ball_towards = self.determine_ball_towards()
 
         # Basic paddle collision
