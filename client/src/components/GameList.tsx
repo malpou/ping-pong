@@ -93,17 +93,16 @@ export function GameList({ serverUrl, onJoinGame, onCreateGame }: GameListProps)
             <button
               onClick={() => onJoinGame(game.id)}
               disabled={game.state === 'GAME_OVER' || game.player_count >= 2}
-              className={`px-4 py-2 rounded ${
-                game.state === 'GAME_OVER' || game.player_count >= 2
+              className={`px-4 py-2 rounded ${game.state === 'GAME_OVER' || game.player_count >= 2
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
             >
               {game.state === 'GAME_OVER'
                 ? 'Game Over'
                 : game.player_count >= 2
-                ? 'Full'
-                : 'Join Game'}
+                  ? 'Full'
+                  : 'Join Game'}
             </button>
           </div>
         ))}

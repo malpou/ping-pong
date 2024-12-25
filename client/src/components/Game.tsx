@@ -89,7 +89,7 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
 
       p.draw = () => {
         p.background(0);
-        
+
         const state = gameStateRef.current;
         if (!state) return;
 
@@ -214,7 +214,7 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit }: GameProps
           Exit Game
         </button>
       </div>
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 bg-black rounded-lg shadow-lg overflow-hidden flex items-center justify-center"
       >
