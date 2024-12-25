@@ -2,47 +2,43 @@ import asyncio
 import os
 import subprocess
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.websockets import WebSocketDisconnect
 
 from logger import logger
 from api.endpoints import endpoints
 from api.websockets import handle_game_connection
-from services.game_room_service import game_room_service
+from database.config import SessionLocal
 
 
 class GameLoop:
     def __init__(self):
-        self.shutdown_event = asyncio.Event()
+        self.rooms = {}
+        self.is_running = True
 
     async def run(self):
-        while not self.shutdown_event.is_set():
+        while self.is_running:
             try:
-                for room in list(game_room_service.rooms.values()):
-                    if room.players:
-                        try:
-                            room.game_state.update()
-                            if not self.shutdown_event.is_set():
-                                await room.broadcast_state()
-                        except RuntimeError:
-                            continue
+                for room in list(self.rooms.values()):
+                    try:
+                        await room.update()
+                    except RuntimeError:
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error updating room: {e}")
             except Exception as e:
                 logger.error(f"Error in game loop: {e}")
             await asyncio.sleep(1 / 60)
 
-    async def shutdown(self):
-        logger.info("Application shutting down...")
-        self.shutdown_event.set()
+    async def stop(self):
+        self.is_running = False
 
-        for room_id in list(game_room_service.rooms.keys()):
-            room = game_room_service.rooms[room_id]
-            for player in list(room.players):
-                try:
-                    await player.close(code=1000, reason="Server shutting down")
-                except Exception as e:
-                    logger.error(f"Error closing WebSocket connection in room {room_id}: {e}")
-            game_room_service.remove_room(room_id)
+    def add_room(self, room):
+        self.rooms[str(room.game_id)] = room
+
+    def remove_room(self, game_id):
+        if str(game_id) in self.rooms:
+            del self.rooms[str(game_id)]
 
 
 game_loop = GameLoop()
@@ -59,7 +55,7 @@ async def lifespan(_: FastAPI):
 
     game_loop_task = asyncio.create_task(game_loop.run())
     yield
-    await game_loop.shutdown()
+    await game_loop.stop()
     game_loop_task.cancel()
     try:
         await game_loop_task
@@ -83,6 +79,7 @@ app.add_middleware(
 )
 
 app.include_router(endpoints)
+
 @app.websocket("/game")
 async def websocket_endpoint(
         websocket: WebSocket,
@@ -90,24 +87,13 @@ async def websocket_endpoint(
         room_id: str | None = None
 ):
     await websocket.accept()
+    db = SessionLocal()
     try:
-        await handle_game_connection(websocket, player_name, room_id, game_room_service)
-    except HTTPException as e:
+        await handle_game_connection(websocket, player_name, room_id, game_loop, db)
+    except Exception as e:
         try:
-            await websocket.close(code=4000, reason=e.detail)
+            await websocket.close(code=4000, reason=str(e))
         except RuntimeError:
             pass  # WebSocket already closed
-
-@app.websocket("/game-updates")
-async def game_updates_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            try:
-                message = await websocket.receive_text()
-                if message == "ping":
-                    await websocket.send_text("pong")
-            except WebSocketDisconnect:
-                break
     finally:
-        await game_room_service.disconnect(websocket)
+        db.close()

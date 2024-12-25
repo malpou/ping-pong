@@ -47,7 +47,6 @@ export interface GameSpecs {
 
 export class PongClient {
   private ws: WebSocket;
-  private heartbeatInterval: number | null = null;
 
   onGameState?: (state: GameState) => void;
   onGameStatus?: (status: string) => void;
@@ -69,17 +68,7 @@ export class PongClient {
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = 'arraybuffer';
     this.setupHandlers();
-    this.startHeartbeat();
   }
-
-  private startHeartbeat() {
-    this.heartbeatInterval = window.setInterval(() => {
-        if (this.ws.readyState === WebSocket.OPEN) {
-            const heartbeat = new Uint8Array([0x00]);
-            this.ws.send(heartbeat);
-        }
-    }, 1000);  // Send heartbeat every second
-}
 
   private setupHandlers() {
     this.ws.onopen = () => this.onConnect?.();
@@ -182,9 +171,6 @@ export class PongClient {
   }
 
   public close() {
-    if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-    }
     this.ws.close();
 }
 }
