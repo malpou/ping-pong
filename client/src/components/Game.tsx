@@ -167,10 +167,10 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
         // Handle keyboard input
         if (keysPressed.current.has('ArrowUp')) {
-          clientRef.current?.sendPaddleDown();
+          clientRef.current?.sendPaddleUp();
         }
         if (keysPressed.current.has('ArrowDown')) {
-          clientRef.current?.sendPaddleUp();
+          clientRef.current?.sendPaddleDown();
         }
       };
 
