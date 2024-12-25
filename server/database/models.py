@@ -33,6 +33,7 @@ class PlayerModel(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     game_id = Column(UUID(as_uuid=True), ForeignKey("games.id"))
+    name = Column(String, nullable=False)  # Player's name
     role = Column(String)  # 'left' or 'right'
     connected = Column(Integer, default=True)
     joined_at = Column(DateTime, default=lambda: datetime.now(UTC))

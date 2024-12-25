@@ -2,12 +2,12 @@ import asyncio
 import os
 import subprocess
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from logger import logger
 from api.endpoints import endpoints
 from api.websockets import handle_game_connection
-import uuid
 
 from networking.game_room_manager import game_room_manager
 from networking.game_update_manager import game_update_manager
@@ -71,12 +71,43 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Configure CORS
+origins = [
+    "http://localhost:5173",    # Vite dev server default port
+    "https://ping.malpou.io",   # Production domain
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],        # Allows all methods
+    allow_headers=["*"],        # Allows all headers
+)
+
 app.include_router(endpoints)
 
 
-@app.websocket("/game/{game_id}")
-async def websocket_endpoint(websocket: WebSocket, game_id: uuid.UUID):
-    await handle_game_connection(websocket, str(game_id), game_room_manager)
+@app.websocket("/game")
+async def websocket_endpoint(
+        websocket: WebSocket,
+        player_name: str | None = None,
+        room_id: str | None = None
+):
+    """WebSocket endpoint for game connections.
+
+    Raises:
+        HTTPException(400): If player_name is not provided
+        HTTPException(404): If trying to join a non-existent game
+    """
+    try:
+        await handle_game_connection(websocket, player_name, room_id, game_room_manager)
+    except HTTPException as e:
+        # Log the error and let the websocket close handle the rest
+        logger.error(f"HTTP Error in websocket connection: {e.detail}")
+        return
+
 
 @app.websocket("/game-updates")
 async def game_updates_endpoint(websocket: WebSocket):
