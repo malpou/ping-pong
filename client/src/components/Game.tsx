@@ -142,7 +142,6 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
         const scaleX = p.width;
         const scaleY = p.height;
-        const state = gameStateRef.current;
       
         // Draw center line
         p.stroke(255, 255, 255, 100);
