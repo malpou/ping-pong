@@ -114,57 +114,61 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
       p.draw = () => {
         p.background(0);
-        const state = gameStateRef.current;
-        if (!state) return;
-
         const scaleX = p.width;
         const scaleY = p.height;
-
+        const state = gameStateRef.current;
+      
         // Draw center line
         p.stroke(255, 255, 255, 100);
         p.strokeWeight(Math.max(1, p.width * 0.002));
         for (let y = 0; y < p.height; y += p.height * 0.05) {
           p.line(p.width / 2, y, p.width / 2, y + p.height * 0.025);
         }
-
+      
         // Draw paddles
         p.noStroke();
         p.fill(255);
         const paddleWidth = p.width * specs.paddle.width;
         const paddleHeight = p.height * specs.paddle.height;
-  
-        // Left paddle
+      
+        // Left paddle - use initial position from specs if no state
+        const leftPaddleY = state ? state.paddles.left : specs.paddle.initial.y;
         p.rect(
           p.width * specs.paddle.collision_bounds.left - paddleWidth / 2,
-          state.paddles.left * scaleY - paddleHeight / 2,
+          leftPaddleY * scaleY - paddleHeight / 2,
           paddleWidth,
           paddleHeight
         );
-
-        // Right paddle
+      
+        // Right paddle - use initial position from specs if no state
+        const rightPaddleY = state ? state.paddles.right : specs.paddle.initial.y;
         p.rect(
           p.width * specs.paddle.collision_bounds.right - paddleWidth / 2,
-          state.paddles.right * scaleY - paddleHeight / 2,
+          rightPaddleY * scaleY - paddleHeight / 2,
           paddleWidth,
           paddleHeight
         );
-
-        // Draw ball
+      
+        // Draw ball - only if game state exists or use initial position
         const ballSize = p.width * specs.ball.radius * 2;
+        const ballX = state ? state.ball.x : specs.ball.initial.x;
+        const ballY = state ? state.ball.y : specs.ball.initial.y;
         p.ellipse(
-          state.ball.x * scaleX,
-          state.ball.y * scaleY,
+          ballX * scaleX,
+          ballY * scaleY,
           ballSize,
           ballSize
         );
-
-        // Draw score
-        const fontSize = Math.max(16, Math.min(48, p.width * 0.05));
-        p.textSize(fontSize);
-        p.textAlign(p.CENTER, p.CENTER);
-        p.text(state.score.left.toString(), p.width * 0.25, fontSize * 1.5);
-        p.text(state.score.right.toString(), p.width * 0.75, fontSize * 1.5);
-
+      
+        // Draw score - only if game state exists
+        if (state) {
+          const fontSize = Math.max(16, Math.min(48, p.width * 0.05));
+          p.textSize(fontSize);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.text(state.score.left.toString(), p.width * 0.25, fontSize * 1.5);
+          p.text(state.score.right.toString(), p.width * 0.75, fontSize * 1.5);
+        }
+      
         // Handle keyboard input
         if (keysPressed.current.has('ArrowUp')) {
           clientRef.current?.sendPaddleUp();

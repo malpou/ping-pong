@@ -1,58 +1,16 @@
 import asyncio
-import os
-import subprocess
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from logger import logger
 from api.endpoints import endpoints
-from api.websockets import handle_game_connection
-from database.config import SessionLocal
-
-
-class GameLoop:
-    def __init__(self):
-        self.rooms = {}
-        self.is_running = True
-
-    async def run(self):
-        while self.is_running:
-            try:
-                for room in list(self.rooms.values()):
-                    try:
-                        await room.update()
-                    except RuntimeError:
-                        continue
-                    except Exception as e:
-                        logger.error(f"Error updating room: {e}")
-            except Exception as e:
-                logger.error(f"Error in game loop: {e}")
-            await asyncio.sleep(1 / 60)
-
-    async def stop(self):
-        self.is_running = False
-
-    def add_room(self, room):
-        self.rooms[str(room.game_id)] = room
-
-    def remove_room(self, game_id):
-        if str(game_id) in self.rooms:
-            del self.rooms[str(game_id)]
-
-
-game_loop = GameLoop()
+from api.game_socket_handler import handle_game_connection
+from core.game_loop import game_loop
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    env = {**os.environ, 'PYTHONPATH': os.getcwd()}
-    try:
-        subprocess.run(["alembic", "upgrade", "head"], check=True, env=env)
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to run migrations: {e}")
-        raise
-
     game_loop_task = asyncio.create_task(game_loop.run())
     yield
     await game_loop.stop()
@@ -80,20 +38,19 @@ app.add_middleware(
 
 app.include_router(endpoints)
 
+
 @app.websocket("/game")
 async def websocket_endpoint(
         websocket: WebSocket,
         player_name: str | None = None,
-        room_id: str | None = None
+        room_id: str | None = None,
+        player_uuid: str | None = None,
 ):
     await websocket.accept()
-    db = SessionLocal()
     try:
-        await handle_game_connection(websocket, player_name, room_id, game_loop, db)
+        await handle_game_connection(websocket, player_name, room_id, player_uuid, game_loop)
     except Exception as e:
         try:
             await websocket.close(code=4000, reason=str(e))
         except RuntimeError:
             pass  # WebSocket already closed
-    finally:
-        db.close()

@@ -1,13 +1,13 @@
 import struct
 import uuid
 from fastapi import WebSocket, WebSocketDisconnect, HTTPException
-from sqlalchemy.orm import Session
+
+from core.game_room import GameRoom
 from domain.game import Game
 from logger import logger
 from networking.binary_protocol import decode_command, CommandType, encode_game_id
 import asyncio
 
-from services.game_room_service import GameRoom
 
 CONNECTION_TIMEOUT = 60 * 5  # Connection timeout in seconds
 
@@ -21,9 +21,12 @@ async def handle_game_connection(
         websocket: WebSocket,
         player_name: str | None = None,
         room_id: str | None = None,
-        game_loop=None,
-        db: Session | None = None
+        player_uuid: str | None = None,
+        game_loop=None
 ):
+    if not player_uuid:
+        await websocket.close(code=1003, reason="Player UUID required")
+
     room = None
     player_role = None
 
@@ -40,12 +43,14 @@ async def handle_game_connection(
         if not room_id:
             room_id = str(uuid.uuid4())
 
-        room = GameRoom(room_id, db)
-
-        if game_loop:
+        # Get existing room or create new one
+        room = game_loop.rooms.get(room_id)
+        if not room:
+            room = GameRoom(room_id)
             game_loop.add_room(room)
 
-        player_role = await room.connect(websocket, player_name)
+        player_role = await room.connect(websocket, player_name, player_uuid)
+
 
         if not player_role:
             raise HTTPException(status_code=409, detail="Room is full")
