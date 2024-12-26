@@ -1,22 +1,5 @@
 services:
- db:
-   image: postgres:16
-   ports:
-     - "5432:5432"
-   environment:
-     POSTGRES_USER: pong
-     POSTGRES_PASSWORD: pong
-     POSTGRES_DB: pong
-   volumes:
-     - postgres_data:/var/lib/postgresql/data
- app:
-   build: .
-   ports:
-     - "8000:80"
-   environment:
-     DATABASE_URL: postgresql://pong:pong@db:5432/pong
-   depends_on:
-     - db
-
-volumes:
- postgres_data:
+  app:
+    build: .
+    ports:
+      - "8000:80"

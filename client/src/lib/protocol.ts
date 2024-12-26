@@ -1,3 +1,5 @@
+import { getPlayerUUID } from "./utils";
+
 function getProtocols(server: string) {
   const isLocalhost = server.includes('localhost') || server.includes('127.0.0.1');
   return {
@@ -58,8 +60,9 @@ export class PongClient {
   constructor(server: string, roomId: string | null, playerName: string) {
     const params = new URLSearchParams();
     params.append('player_name', playerName);
+    params.append('player_uuid', getPlayerUUID());
     if (roomId) {
-      params.append('room_id', roomId);
+        params.append('room_id', roomId);
     }
 
     const { ws: protocol } = getProtocols(server);
@@ -68,7 +71,8 @@ export class PongClient {
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = 'arraybuffer';
     this.setupHandlers();
-  }
+}
+
 
   private setupHandlers() {
     this.ws.onopen = () => this.onConnect?.();

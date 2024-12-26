@@ -1,14 +1,11 @@
 import uuid
-from datetime import datetime, timedelta, UTC
+from datetime import datetime
 from typing import Dict, List
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 
-from database.config import get_db
-from database.models import GameModel
+from core.game_loop import game_loop
 from domain.ball import Ball
 from domain.game import Game
 from domain.paddle import Paddle
@@ -22,38 +19,25 @@ class GameInfo(BaseModel):
     left_score: int
     right_score: int
     winner: str | None
-    created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
 @endpoints.get("/games", response_model=List[GameInfo])
-async def get_games(request: Request, db: Session = Depends(get_db)) -> List[GameInfo]:
-    """Get all current games and games finished within last 5 minutes."""
-    five_minutes_ago = datetime.now(UTC) - timedelta(minutes=5)
-
-    games = db.query(GameModel).filter(
-        or_(
-            GameModel.state != Game.State.GAME_OVER,
-            GameModel.updated_at >= five_minutes_ago
-        )
-    ).order_by(GameModel.created_at.desc()).all()
-
-    return [
-        GameInfo(
-            id=game.id,
-            state=Game.State(game.state),
-            player_count=game.total_connected,  # Use property
-            left_score=game.left_score,
-            right_score=game.right_score,
-            winner=game.winner,
-            created_at=game.created_at,
-            updated_at=game.updated_at
-        )
-        for game in games
-    ]
+async def get_games(_: Request) -> List[GameInfo]:
+    active_games = []
+    
+    for room in game_loop.rooms.values():
+        if not room.is_expired:
+            active_games.append(GameInfo(
+                id=uuid.UUID(room.game_id),
+                state=room.game_state.state,
+                player_count=len([p for p in room.players.values() if p.connected]),
+                left_score=room.game_state.left_score,
+                right_score=room.game_state.right_score,
+                winner=room.game_state.winner,
+                updated_at=room.last_activity
+            ))
+    
+    return active_games
 
 @endpoints.get("/specs")
 def get_game_specs(_: Request) -> Dict:
