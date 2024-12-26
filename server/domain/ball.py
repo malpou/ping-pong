@@ -15,7 +15,10 @@ class Ball:
         self.x, self.y = self.calc_pos()
 
         # Bounce off top and bottom
-        if self.y <= self.radius or self.y >= 1 - self.radius:
+        if (
+                ((self.y <= self.radius) and (np.pi <= np.mod(self.angle, 2 * np.pi) <= 2 * np.pi)) or
+                ((self.y >= 1 - self.radius) and (0 <= np.mod(self.angle, 2 * np.pi) <= np.pi))
+        ):
             self.angle = -self.angle
 
     def calc_pos(self):
