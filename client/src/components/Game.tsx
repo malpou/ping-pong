@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import p5 from 'p5';
 import { PongClient, GameState, GameSpecs } from '../lib/protocol';
+import Particle from '../graphics/Particle';
+import { Engine } from 'matter-js';
 
 interface GameProps {
   playerName: string;
@@ -107,6 +109,10 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
   // p5.js setup and game rendering
   useEffect(() => {
     const sketch = (p: p5) => {
+
+      const engine = Engine.create();
+      const particles: Particle[] = [];
+      
       p.setup = () => {
         const { width, height } = calculateCanvasSize();
         p.createCanvas(width, height);
@@ -114,6 +120,26 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
       p.draw = () => {
         p.background(0);
+
+        Engine.update(engine);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          if (!particles[i].update(engine)) {
+            particles.splice(i, 1);
+          } else {
+            particles[i].show(p); // Pass the p5 instance here
+          }
+        }
+
+        p.mousePressed = () => {
+          for (let i = 0; i < 10; i++) {
+            particles.push(new Particle(p.mouseX, p.mouseY, p.random(5, 10), engine));
+          }
+        };
+
+        const state = gameStateRef.current;
+        if (!state) return;
+
         const scaleX = p.width;
         const scaleY = p.height;
         const state = gameStateRef.current;

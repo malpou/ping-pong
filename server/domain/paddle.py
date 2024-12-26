@@ -14,8 +14,9 @@ class Paddle:
 
     def __init__(self, x_pos: float):
         self.x_position = x_pos
-        self.y_min = self.y_position - self.height / 2 
-        self.y_max = self.y_position + self.height / 2 
+        self.h = self.height / 2
+        self.y_min = self.y_position - self.h
+        self.y_max = self.y_position + self.h
 
     def is_on_paddle(self, ball: Ball) -> bool:
         # Check if the ball is near the paddle in the horizontal direction (x-axis)
@@ -27,8 +28,8 @@ class Paddle:
 
     def move_up(self) -> None:
         new_y = self.y_position - self.speed
-        self.y_position = max(self.height / 2, new_y)
+        self.y_position = max(self.h, new_y)
 
     def move_down(self) -> None:
         new_y = self.y_position + self.speed
-        self.y_position = min(1.0 - self.height / 2, new_y)
+        self.y_position = min(1.0 - self.h, new_y)
