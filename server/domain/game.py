@@ -18,13 +18,14 @@ class Game:
     GAME_WIDTH = 1.0  # Normalized game width
     GAME_HEIGHT = 1.0  # Normalized game height
     SCORE_DELAY = 1.0  # 1 second delay after scoring
+    START_DELAY = 3.0  # 3 second delay at game start
 
     # Speed multiplier constants
     BASE_SPEED = 1/60 * 1/2
-    SPEED_TIER_1 = 1.5  # After 5 hits
-    SPEED_TIER_2 = 2.0  # After 10 hits
+    SPEED_TIER_1 = 1.25  # After 5 hits
+    SPEED_TIER_2 = 1.5  # After 10 hits
     SPEED_INCREMENT = 0.1  # Per hit after 10 hits
-    MAX_SPEED_MULTIPLIER = 4.0  # Cap at 20 hits
+    MAX_SPEED_MULTIPLIER = 3.0  # After 20 hits
 
     left_paddle: Paddle = field(default_factory=lambda: Paddle(Game.LEFT_PADDLE_X))
     right_paddle: Paddle = field(default_factory=lambda: Paddle(Game.RIGHT_PADDLE_X))
@@ -37,11 +38,20 @@ class Game:
     player_count: int = 0
     ball_towards: GameSide = GameSide.LEFT
     score_timer: float = 0
+    start_timer: float = 0
     scoring_side: GameSide | None = None
     paddle_hits: int = 0
+    starting_state: bool = False
 
     def update(self) -> None:
         if self.winner or self.state != GameState.PLAYING or self.player_count < 2:
+            return
+
+        # Handle start delay
+        if self.starting_state:
+            if time.time() - self.start_timer >= self.START_DELAY:
+                self.starting_state = False
+                self.ball.reset(GameSide.LEFT)
             return
 
         # Handle scoring delay
@@ -106,6 +116,8 @@ class Game:
         self.player_count += 1
         if self.player_count == 2:
             self.state = GameState.PLAYING
+            self.starting_state = True
+            self.start_timer = time.time()
 
     def remove_player(self) -> None:
         self.player_count -= 1
