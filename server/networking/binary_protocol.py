@@ -3,7 +3,7 @@ from struct import pack, unpack
 from enum import IntEnum
 from typing import Optional
 
-from domain.game import Game
+from domain.enums import GameState
 
 
 class CommandType(IntEnum):
@@ -23,15 +23,15 @@ class GameUpdateType(IntEnum):
     PLAYER_JOINED = 4
 
 def encode_game_update(update_type: GameUpdateType, game_id: uuid.UUID,
-                       state: Game.State, player_count: int,
+                       state: GameState, player_count: int,
                        left_score: int = 0, right_score: int = 0,
                        winner: str | None = None) -> bytes:
     """Encode game updates into binary format."""
     state_value = {
-        Game.State.WAITING: 0,
-        Game.State.PLAYING: 1,
-        Game.State.PAUSED: 2,
-        Game.State.GAME_OVER: 3
+        GameState.WAITING: 0,
+        GameState.PLAYING: 1,
+        GameState.PAUSED: 2,
+        GameState.GAME_OVER: 3
     }[state]
 
     winner_code = 0

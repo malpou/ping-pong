@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-
 import numpy as np
+
+from domain.enums import GameSide
 
 
 @dataclass
@@ -8,8 +9,16 @@ class Ball:
     x: float = 0.5  # Position as percentage of screen width
     y: float = 0.5  # Position as percentage of screen height
     angle: float = 0  # Velocity angle
-    speed: float = 1 / 60 * 1 / 2  # Velocity norm
+    speed: float = None  # Will be set by Game class
     radius: float = 0.02  # Radius as percentage of screen width
+    first_serve: bool = True
+
+    def __post_init__(self):
+        if self.speed is None:
+            self.speed = 1/60 * 1/2  # Default speed if not set by Game
+
+    def set_speed(self, new_speed: float) -> None:
+        self.speed = new_speed
 
     def update_position(self) -> None:
         self.x, self.y = self.calc_pos()
@@ -30,7 +39,20 @@ class Ball:
 
         return x, y
 
-    def reset(self) -> None:
+    def set_direction(self, direction: GameSide = None) -> None:
+        if direction == GameSide.LEFT:
+            self.angle = np.pi  # Towards left
+        elif direction == GameSide.RIGHT:
+            self.angle = 0  # Towards right
+        else:
+            # Random first serve
+            self.angle = np.random.choice([0, np.pi])
+
+    def reset(self, direction: GameSide = None) -> None:
         self.x = 0.5
         self.y = 0.5
-        self.angle = 0
+        if self.first_serve:
+            self.set_direction()
+            self.first_serve = False
+        else:
+            self.set_direction(direction)

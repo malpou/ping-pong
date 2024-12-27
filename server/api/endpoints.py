@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from core.game_loop import game_loop
 from domain.ball import Ball
+from domain.enums import GameState
 from domain.game import Game
 from domain.paddle import Paddle
 
@@ -14,7 +15,7 @@ endpoints = APIRouter()
 
 class GameInfo(BaseModel):
     id: uuid.UUID
-    state: Game.State
+    state: GameState
     player_count: int
     left_score: int
     right_score: int
