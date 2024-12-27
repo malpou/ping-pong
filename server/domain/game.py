@@ -76,11 +76,11 @@ class Game:
             self.handle_paddle_hit(self.right_paddle)
 
     def determine_ball_towards(self) -> GameSide :
-        if (np.pi / 2 <= np.mod(self.ball.angle, 2 * np.pi) <= 3 * np.pi / 2):
+        if (np.pi / 2 <= self.ball.angle <= 3 * np.pi / 2):
             return GameSide.LEFT
         if (
-            (np.mod(self.ball.angle, 2 * np.pi) <= (np.pi / 2)) or 
-            (np.mod(self.ball.angle, 2 * np.pi) >= (3 * np.pi / 2))
+            (self.ball.angle <= (np.pi / 2)) or 
+            (self.ball.angle >= (3 * np.pi / 2))
         ):
             return GameSide.RIGHT
 
@@ -99,6 +99,8 @@ class Game:
         f = interpolate.interp1d(y_values, angle_values)
 
         angle_interpolated = f(self.ball.y)
+        # normalize the angle to [0, 2*pi]
+        angle_interpolated = self.ball.normalize_angle(angle_interpolated)
 
         return angle_interpolated
 

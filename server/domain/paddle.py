@@ -5,7 +5,7 @@ from domain.ball import Ball
 
 @dataclass
 class Paddle:
-    INITIAL_Y = 0.5  # Default center position
+    INITIAL_Y = 0.45  # Default center position
     
     x_position: float # Position as percentage of screen height (0-1)
     y_position: float = INITIAL_Y  # Position as percentage of screen height (0-1)
