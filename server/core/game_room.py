@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from domain.enums import GameState
 from domain.game import Game
 from logger import logger
 from networking.binary_protocol import encode_game_state, encode_game_status
@@ -39,7 +40,7 @@ class GameRoom:
         """Check if room should be cleaned up"""
         inactive_time = time.time() - self.last_activity
         return (inactive_time > self.INACTIVE_TIMEOUT and
-                (self.game_state.state == Game.State.GAME_OVER or not self.players))
+                (self.game_state.state == GameState.GAME_OVER or not self.players))
 
     async def connect(self, websocket: WebSocket, player_name: str, player_uuid: str) -> Optional[str]:
         """Connect a player to the game room."""
@@ -100,7 +101,7 @@ class GameRoom:
         # Update game state if needed
         connected_count = len([p for p in self.players.values() if p.connected])
         if connected_count < 2:
-            self.game_state.state = Game.State.PAUSED
+            self.game_state.state = GameState.PAUSED
             logger.info(f"Room {self.game_id}: Game paused")
 
     async def update(self) -> None:
@@ -110,7 +111,7 @@ class GameRoom:
         connected_count = len([p for p in self.players.values() if p.connected])
 
         # Handle game start when room is full
-        if connected_count == 2 and self.game_state.state == Game.State.WAITING:
+        if connected_count == 2 and self.game_state.state == GameState.WAITING:
             if not self.starting:
                 self.starting = True
                 self.game_start_timer = time.time()
@@ -122,29 +123,29 @@ class GameRoom:
             elapsed = time.time() - self.game_start_timer
             if elapsed >= 3:  # 3 second countdown
                 self.starting = False
-                self.game_state.state = Game.State.PLAYING
+                self.game_state.state = GameState.PLAYING
                 await self.broadcast_game_status("game_in_progress")
             return  # Don't update game state during countdown
 
         # Update game state only if playing
-        if self.game_state.state == Game.State.PLAYING:
+        if self.game_state.state == GameState.PLAYING:
             self.game_state.update()
 
         # Handle state transitions
-        if self.game_state.state == Game.State.PLAYING and previous_state != Game.State.PLAYING:
+        if self.game_state.state == GameState.PLAYING and previous_state != GameState.PLAYING:
             await self.broadcast_game_status("game_in_progress")
-        elif self.game_state.state == Game.State.PAUSED and previous_state != Game.State.PAUSED:
+        elif self.game_state.state == GameState.PAUSED and previous_state != GameState.PAUSED:
             await self.broadcast_game_status("game_paused")
-        elif self.game_state.state == Game.State.GAME_OVER and previous_state != Game.State.GAME_OVER:
+        elif self.game_state.state == GameState.GAME_OVER and previous_state != GameState.GAME_OVER:
             await self.broadcast_game_status(f"game_over_{self.game_state.winner}")
 
         # Only broadcast state if game is playing
-        if self.game_state.state == Game.State.PLAYING:
+        if self.game_state.state == GameState.PLAYING:
             await self.broadcast_state()
 
     async def broadcast_state(self) -> None:
         """Broadcast game state to all connected players."""
-        if not self.players or self.game_state.state != Game.State.PLAYING:
+        if not self.players or self.game_state.state != GameState.PLAYING:
             return
 
         state_bytes = encode_game_state(

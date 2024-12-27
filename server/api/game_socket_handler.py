@@ -3,7 +3,7 @@ import uuid
 from fastapi import WebSocket, WebSocketDisconnect, HTTPException
 
 from core.game_room import GameRoom
-from domain.game import Game
+from domain.enums import GameState
 from logger import logger
 from networking.binary_protocol import decode_command, CommandType, encode_game_id
 import asyncio
@@ -68,7 +68,7 @@ async def handle_game_connection(
                     try:
                         command = decode_command(message["bytes"])
 
-                        if room.game_state.state != Game.State.PLAYING:
+                        if room.game_state.state != GameState.PLAYING:
                             continue
 
                         if command == CommandType.PADDLE_UP:
