@@ -1,31 +1,30 @@
 from dataclasses import dataclass
 from dataclasses import field
-from enum import Enum
 from scipy import interpolate
+import time
 
 import numpy as np
 
 from domain.ball import Ball
+from domain.enums import GameState, GameSide
 from domain.paddle import Paddle
 from logger import logger
 
 @dataclass
 class Game:
-    class State(Enum):
-        WAITING = "waiting"
-        PLAYING = "playing"
-        PAUSED = "paused"
-        GAME_OVER = "game_over"
-    
-    class Side(Enum):
-        LEFT = "left"
-        RIGHT = "right"
-
     POINTS_TO_WIN = 5  # Configurable win condition
     LEFT_PADDLE_X = 0.05  # X position for left paddle collision
     RIGHT_PADDLE_X = 0.95  # X position for right paddle collision
     GAME_WIDTH = 1.0  # Normalized game width
     GAME_HEIGHT = 1.0  # Normalized game height
+    SCORE_DELAY = 1.0  # 1 second delay after scoring
+
+    # Speed multiplier constants
+    BASE_SPEED = 1/60 * 1/2
+    SPEED_TIER_1 = 1.5  # After 5 hits
+    SPEED_TIER_2 = 2.0  # After 10 hits
+    SPEED_INCREMENT = 0.1  # Per hit after 10 hits
+    MAX_SPEED_MULTIPLIER = 4.0  # Cap at 20 hits
 
     left_paddle: Paddle = field(default_factory=lambda: Paddle(Game.LEFT_PADDLE_X))
     right_paddle: Paddle = field(default_factory=lambda: Paddle(Game.RIGHT_PADDLE_X))
@@ -34,27 +33,31 @@ class Game:
     right_score: int = 0
     winner: str | None = None
     room_id: str | None = None
-    state: State = field(default=State.WAITING)
+    state: GameState = field(default=GameState.WAITING)
     player_count: int = 0
-    ball_towards: Side = Side.LEFT
+    ball_towards: GameSide = GameSide.LEFT
+    score_timer: float = 0
+    scoring_side: GameSide | None = None
+    paddle_hits: int = 0
 
     def update(self) -> None:
-        if self.winner or self.state != self.State.PLAYING or self.player_count < 2:
+        if self.winner or self.state != GameState.PLAYING or self.player_count < 2:
+            return
+
+        # Handle scoring delay
+        if self.scoring_side is not None:
+            if time.time() - self.score_timer >= self.SCORE_DELAY:
+                self.ball.reset(self.scoring_side)
+                self.scoring_side = None
             return
 
         self.ball.update_position()
 
         # Check for scoring
         if self.ball.x <= 0:
-            self.right_score += 1
-            logger.info(f"Room {self.room_id}: Current score - Left: {self.left_score}, Right: {self.right_score} - RIGHT SCORED!")
-            self.ball.reset()
-            self._check_winner()
+            self.handle_scoring(GameSide.LEFT, self.right_score + 1)
         elif self.ball.x >= self.GAME_WIDTH:
-            self.left_score += 1
-            logger.info(f"Room {self.room_id}: Current score - Left: {self.left_score}, Right: {self.right_score} - LEFT SCORED!")
-            self.ball.reset()
-            self._check_winner()
+            self.handle_scoring(GameSide.RIGHT, self.left_score + 1)
 
         # Find which direction the ball is going towards
         self.ball_towards = self.determine_ball_towards()
@@ -62,27 +65,27 @@ class Game:
         # Basic paddle collision
         if (
             (self.left_paddle.is_on_paddle(self.ball)) and 
-            self.ball_towards == self.Side.LEFT
+            self.ball_towards == GameSide.LEFT
         ):
-            self.ball.angle = self.calc_angle(self.left_paddle)
+            self.handle_paddle_hit(self.left_paddle)
 
         if (
             (self.right_paddle.is_on_paddle(self.ball)) and 
-            self.ball_towards == self.Side.RIGHT
+            self.ball_towards == GameSide.RIGHT
         ):
-            self.ball.angle = self.calc_angle(self.right_paddle)
+            self.handle_paddle_hit(self.right_paddle)
 
-    def determine_ball_towards(self) -> Side :
+    def determine_ball_towards(self) -> GameSide :
         if (np.pi / 2 <= np.mod(self.ball.angle, 2 * np.pi) <= 3 * np.pi / 2):
-            return self.Side.LEFT
+            return GameSide.LEFT
         if (
             (np.mod(self.ball.angle, 2 * np.pi) <= (np.pi / 2)) or 
             (np.mod(self.ball.angle, 2 * np.pi) >= (3 * np.pi / 2))
         ):
-            return self.Side.RIGHT
+            return GameSide.RIGHT
 
     def calc_angle(self, paddle: Paddle) -> float:
-        if self.ball_towards == self.Side.LEFT:
+        if self.ball_towards == GameSide.LEFT:
             angle_min = -np.pi / 3
             angle_max = np.pi / 3
         else:
@@ -102,17 +105,53 @@ class Game:
     def add_player(self) -> None:
         self.player_count += 1
         if self.player_count == 2:
-            self.state = self.State.PLAYING
+            self.state = GameState.PLAYING
 
     def remove_player(self) -> None:
         self.player_count -= 1
-        if self.player_count < 2 and self.state == self.State.PLAYING:
-            self.state = self.State.PAUSED
+        if self.player_count < 2 and self.state == GameState.PLAYING:
+            self.state = GameState.PAUSED
 
     def _check_winner(self) -> None:
         if self.left_score >= self.POINTS_TO_WIN:
             self.winner = "left"
-            self.state = self.State.GAME_OVER
+            self.state = GameState.GAME_OVER
         elif self.right_score >= self.POINTS_TO_WIN:
             self.winner = "right"
-            self.state = self.State.GAME_OVER
+            self.state = GameState.GAME_OVER
+
+    def reset_paddles(self) -> None:
+        """Reset paddles to center position"""
+        self.left_paddle.reset_position()
+        self.right_paddle.reset_position()
+
+    def handle_scoring(self, side: GameSide, new_score: int) -> None:
+        if side == GameSide.LEFT:
+            self.right_score = new_score
+            logger.info(f"Room {self.room_id}: Current score - Left: {self.left_score}, Right: {self.right_score} - RIGHT SCORED!")
+        else:
+            self.left_score = new_score
+            logger.info(f"Room {self.room_id}: Current score - Left: {self.left_score}, Right: {self.right_score} - LEFT SCORED!")
+        
+        self.paddle_hits = 0
+        self.ball.set_speed(self.BASE_SPEED)
+        self.reset_paddles()
+        self.score_timer = time.time()
+        self.scoring_side = side
+        self._check_winner()
+
+    def calculate_ball_speed(self) -> float:
+        if self.paddle_hits < 5:
+            return self.BASE_SPEED
+        elif self.paddle_hits < 10:
+            return self.BASE_SPEED * self.SPEED_TIER_1
+        elif self.paddle_hits < 20:
+            multiplier = self.SPEED_TIER_2 + (self.paddle_hits - 10) * self.SPEED_INCREMENT
+            return self.BASE_SPEED * min(multiplier, self.MAX_SPEED_MULTIPLIER)
+        else:
+            return self.BASE_SPEED * self.MAX_SPEED_MULTIPLIER
+
+    def handle_paddle_hit(self, paddle: Paddle) -> None:
+        self.paddle_hits += 1
+        self.ball.set_speed(self.calculate_ball_speed())
+        self.ball.angle = self.calc_angle(paddle)
