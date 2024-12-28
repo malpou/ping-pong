@@ -1,4 +1,4 @@
-﻿package game
+package game
 
 import (
 	"math"
@@ -43,9 +43,9 @@ func (b *Ball) UpdatePosition() {
 }
 
 func (b *Ball) SetDirection(direction Side) {
-	if direction == SideLeft {
+	if direction == Left {
 		b.Angle = math.Pi // Towards left
-	} else if direction == SideRight {
+	} else if direction == Right {
 		b.Angle = 0 // Towards right
 	} else {
 		// Random first serve
@@ -62,7 +62,7 @@ func (b *Ball) Reset(direction Side) {
 	b.Y = 0.5
 	b.FirstServe = false
 
-	if direction == SideLeft || direction == SideRight {
+	if direction == Left || direction == Right {
 		b.SetDirection(direction)
 	} else {
 		// Handle the case for random first serve if needed

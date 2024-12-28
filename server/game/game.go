@@ -1,4 +1,4 @@
-﻿package game
+package game
 
 import (
 	"math"
@@ -7,25 +7,35 @@ import (
 
 type State string
 type Side string
+type Direction byte
 
 const (
-	StateWaiting       State = "waiting"
-	StatePlaying       State = "playing"
-	StatePaused        State = "paused"
-	StateGameOver      State = "game_over"
-	SideLeft           Side  = "left"
-	SideRight          Side  = "right"
-	PaddleUp                 = 'U'
-	PaddleDown               = 'D'
-	PointsToWin              = 5
-	Size                     = 1.0
-	ScoreDelay               = 1.0
-	StartDelay               = 3.0
-	BaseSpeed                = 1.0 / 60.0 / 2.0
-	SpeedTier1               = 1.25
-	SpeedTier2               = 1.5
-	SpeedIncrement           = 0.1
-	MaxSpeedMultiplier       = 3.0
+	Waiting  State = "waiting"
+	Playing  State = "playing"
+	Paused   State = "paused"
+	GameOver State = "game_over"
+)
+
+const (
+	Left  Side = "left"
+	Right Side = "right"
+)
+
+const (
+	Up   Direction = 'U'
+	Down Direction = 'D'
+)
+
+const (
+	PointsToWin        = 5
+	Size               = 1.0
+	ScoreDelay         = 1.0
+	StartDelay         = 3.0
+	BaseSpeed          = 1.0 / 60.0 / 2.0
+	SpeedTier1         = 1.25
+	SpeedTier2         = 1.5
+	SpeedIncrement     = 0.1
+	MaxSpeedMultiplier = 3.0
 )
 
 type Game struct {
@@ -34,7 +44,7 @@ type Game struct {
 	Ball        *Ball
 	LeftScore   int
 	RightScore  int
-	Winner      string
+	Winner      Side
 	State       State
 	PlayerCount int
 	BallTowards Side
@@ -50,19 +60,19 @@ func NewGame() *Game {
 		LeftPaddle:  NewPaddle(0.05),
 		RightPaddle: NewPaddle(0.95),
 		Ball:        NewBall(),
-		State:       StateWaiting,
+		State:       Waiting,
 	}
 }
 
 func (g *Game) Update() {
-	if g.Winner != "" || g.State != StatePlaying || g.PlayerCount < 2 {
+	if g.Winner != "" || g.State != Playing || g.PlayerCount < 2 {
 		return
 	}
 
 	if g.Starting {
 		if time.Since(g.StartTimer).Seconds() >= StartDelay {
 			g.Starting = false
-			g.Ball.Reset(SideLeft)
+			g.Ball.Reset(Left)
 		}
 		return
 	}
@@ -78,17 +88,17 @@ func (g *Game) Update() {
 	g.Ball.UpdatePosition()
 
 	if g.Ball.X <= 0 {
-		g.HandleScoring(SideLeft, g.RightScore+1)
+		g.HandleScoring(Left, g.RightScore+1)
 	} else if g.Ball.X >= Size {
-		g.HandleScoring(SideRight, g.LeftScore+1)
+		g.HandleScoring(Right, g.LeftScore+1)
 	}
 
 	g.BallTowards = g.DetermineBallTowards()
 
-	if g.LeftPaddle.IsOnPaddle(g.Ball) && g.BallTowards == SideLeft {
+	if g.LeftPaddle.IsOnPaddle(g.Ball) && g.BallTowards == Left {
 		g.HandlePaddleHit(g.LeftPaddle)
 	}
-	if g.RightPaddle.IsOnPaddle(g.Ball) && g.BallTowards == SideRight {
+	if g.RightPaddle.IsOnPaddle(g.Ball) && g.BallTowards == Right {
 		g.HandlePaddleHit(g.RightPaddle)
 	}
 }
@@ -96,13 +106,13 @@ func (g *Game) Update() {
 func (g *Game) DetermineBallTowards() Side {
 	angleMod := math.Mod(g.Ball.Angle, 2*math.Pi)
 	if math.Pi/2 <= angleMod && angleMod <= 3*math.Pi/2 {
-		return SideLeft
+		return Left
 	}
-	return SideRight
+	return Right
 }
 
 func (g *Game) HandleScoring(side Side, newScore int) {
-	if side == SideLeft {
+	if side == Left {
 		g.RightScore = newScore
 	} else {
 		g.LeftScore = newScore
@@ -111,32 +121,31 @@ func (g *Game) HandleScoring(side Side, newScore int) {
 	g.Ball.SetSpeed(BaseSpeed)
 	g.ResetPaddles()
 	g.ScoreTimer = time.Now()
-	g.ScoringSide = side
 	g.CheckWinner()
 }
 
 func (g *Game) CheckWinner() {
 	if g.LeftScore >= PointsToWin {
-		g.Winner = "left"
-		g.State = StateGameOver
+		g.Winner = Left
+		g.State = GameOver
 	} else if g.RightScore >= PointsToWin {
-		g.Winner = "right"
-		g.State = StateGameOver
+		g.Winner = Right
+		g.State = GameOver
 	}
 }
 
-func (g *Game) MovePaddle(playerName string, direction byte) {
-	switch playerName {
-	case "left":
-		if direction == PaddleUp {
+func (g *Game) MovePaddle(side Side, direction Direction) {
+	switch side {
+	case Left:
+		if direction == Up {
 			g.LeftPaddle.MoveUp()
-		} else if direction == PaddleDown {
+		} else if direction == Down {
 			g.LeftPaddle.MoveDown()
 		}
 	case "right":
-		if direction == PaddleUp {
+		if direction == Up {
 			g.RightPaddle.MoveUp()
-		} else if direction == PaddleDown {
+		} else if direction == Down {
 			g.RightPaddle.MoveDown()
 		}
 	}
@@ -155,7 +164,7 @@ func (g *Game) HandlePaddleHit(paddle *Paddle) {
 
 func (g *Game) CalcAngle(paddle *Paddle) float64 {
 	var angleMin, angleMax float64
-	if g.BallTowards == SideLeft {
+	if g.BallTowards == Left {
 		angleMin, angleMax = -math.Pi/3, math.Pi/3
 	} else {
 		angleMin, angleMax = 4*math.Pi/3, 2*math.Pi/3
@@ -179,7 +188,7 @@ func (g *Game) CalculateBallSpeed() float64 {
 func (g *Game) AddPlayer() {
 	g.PlayerCount++
 	if g.PlayerCount == 2 {
-		g.State = StatePlaying
+		g.State = Playing
 		g.Starting = true
 		g.StartTimer = time.Now()
 	}
@@ -187,7 +196,7 @@ func (g *Game) AddPlayer() {
 
 func (g *Game) RemovePlayer() {
 	g.PlayerCount--
-	if g.PlayerCount < 2 && g.State == StatePlaying {
-		g.State = StatePaused
+	if g.PlayerCount < 2 && g.State == Playing {
+		g.State = Paused
 	}
 }

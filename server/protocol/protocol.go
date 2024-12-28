@@ -1,8 +1,9 @@
-﻿package protocol
+package protocol
 
 import (
 	"encoding/json"
 	"log"
+	"pingpong/game"
 )
 
 const (
@@ -28,7 +29,7 @@ type ClientActions interface {
 	HandleGetGames()
 	HandleJoinRoom(roomID string)
 	HandleCreateRoom()
-	HandleMovePaddle(direction byte)
+	HandleMovePaddle(direction game.Direction)
 	GetName() string
 	GetRoomID() string
 	Send(msg Message)
@@ -87,12 +88,19 @@ func ParseMessage(client ClientActions, rawMessage []byte) {
 	case CreateRoom:
 		client.HandleCreateRoom()
 	case MovePaddle:
-		if direction, ok := message.Data.(string); ok {
-			client.HandleMovePaddle(direction[0])
+		if direction, ok := message.Data.(string); ok && len(direction) > 0 {
+			switch game.Direction(direction[0]) {
+			case game.Up, game.Down:
+				client.HandleMovePaddle(game.Direction(direction[0]))
+			default:
+				errorMessage.Data = "Invalid move_paddle direction"
+				client.Send(errorMessage)
+			}
 		} else {
 			errorMessage.Data = "Invalid move_paddle data"
 			client.Send(errorMessage)
 		}
+
 	default:
 		log.Println("Unknown message type:", message.Type)
 	}

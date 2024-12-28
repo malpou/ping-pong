@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ func TestClientNotInGame(t *testing.T) {
 
 	SendMessage(t, conn, protocol.Message{
 		Type: protocol.MovePaddle,
-		Data: game.PaddleUp,
+		Data: game.Up,
 	})
 
 	response := ReadMessage(t, conn)

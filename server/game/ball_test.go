@@ -1,4 +1,4 @@
-﻿package game
+package game
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -64,10 +64,10 @@ func TestBallBounceOffBottomWall(t *testing.T) {
 func TestBallSetDirection(t *testing.T) {
 	ball := NewBall()
 
-	ball.SetDirection(SideLeft)
+	ball.SetDirection(Left)
 	assert.Equal(t, math.Pi, ball.Angle, "Ball angle should be set to Pi when direction is left")
 
-	ball.SetDirection(SideRight)
+	ball.SetDirection(Right)
 	assert.Equal(t, 0.0, ball.Angle, "Ball angle should be set to 0 when direction is right")
 
 	ball.SetDirection("")
@@ -77,11 +77,11 @@ func TestBallSetDirection(t *testing.T) {
 func TestBallReset(t *testing.T) {
 	ball := NewBall()
 
-	ball.SetDirection(SideRight)
+	ball.SetDirection(Right)
 	ball.X = 0.2
 	ball.Y = 0.8
 
-	ball.Reset(SideLeft)
+	ball.Reset(Left)
 
 	assert.Equal(t, 0.5, ball.X, "Ball X position should be reset to 0.5")
 	assert.Equal(t, 0.5, ball.Y, "Ball Y position should be reset to 0.5")
@@ -96,7 +96,7 @@ func TestBallResetFirstServe(t *testing.T) {
 
 	assert.True(t, ball.FirstServe, "FirstServe should be true initially")
 
-	ball.Reset(SideLeft)
+	ball.Reset(Left)
 
 	assert.False(t, ball.FirstServe, "FirstServe should be false after the first reset")
 }

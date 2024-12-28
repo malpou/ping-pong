@@ -1,4 +1,4 @@
-﻿package server
+package server
 
 import (
 	"encoding/json"
@@ -29,6 +29,7 @@ type Client struct {
 	Conn   *websocket.Conn
 	Server *Server
 	Name   string
+	Side   game.Side
 	Room   *Room
 }
 
@@ -146,12 +147,12 @@ func (c *Client) HandleCreateRoom() {
 	})
 }
 
-func (c *Client) HandleMovePaddle(direction byte) {
+func (c *Client) HandleMovePaddle(direction game.Direction) {
 	if c.Room == nil {
 		return
 	}
 
-	c.Room.Game.MovePaddle(c.Name, direction)
+	c.Room.Game.MovePaddle(c.Side, direction)
 
 	response := protocol.Message{
 		Type: protocol.MovePaddleResponse,
