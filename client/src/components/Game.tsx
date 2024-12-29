@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import p5 from 'p5';
 import { PongClient, GameState, GameSpecs } from '../lib/protocol';
 import Particle from '../graphics/Particle';
-import { Engine } from 'matter-js';
+import { Engine, Bodies, World, Body as MatterBody } from 'matter-js';
+import type { Body } from 'matter-js'; // Import as type only
 
 interface GameProps {
   playerName: string;
@@ -112,10 +113,52 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
       const engine = Engine.create();
       const particles: Particle[] = [];
+
+      // Paddle bodies
+      let leftPaddle: Body;
+      let rightPaddle: Body;
+
+      //
+      let ballBody: Body;
+      
       
       p.setup = () => {
         const { width, height } = calculateCanvasSize();
         p.createCanvas(width, height);
+
+        // Initialize paddle bodies
+        const paddleWidth = width * specs.paddle.width;
+        const paddleHeight = height * specs.paddle.height;
+
+        // Left paddle body
+        leftPaddle = Bodies.rectangle(
+          width * specs.paddle.collision_bounds.left,
+          height * specs.paddle.initial.y, // initial Y position
+          paddleWidth,
+          paddleHeight,
+          { isStatic: true } // Make it static
+        );
+
+        // Right paddle body
+        rightPaddle = Bodies.rectangle(
+          width * specs.paddle.collision_bounds.right,
+          height * specs.paddle.initial.y, // initial Y position
+          paddleWidth,
+          paddleHeight,
+          { isStatic: true } // Make it static
+        );
+
+        // Ball body
+        ballBody = Bodies.circle(
+          specs.ball.initial.x, 
+          specs.ball.initial.y, 
+          specs.ball.radius,
+          { isStatic: true } // Make it static
+        )
+
+        // Add paddles to the physics world
+        World.add(engine.world, [leftPaddle, rightPaddle]);
+        World.add(engine.world, [ballBody]);
       };
 
       p.draw = () => {
@@ -132,8 +175,8 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
         }
 
         p.mousePressed = () => {
-          for (let i = 0; i < 10; i++) {
-            particles.push(new Particle(p.mouseX, p.mouseY, p.random(5, 10), engine));
+          for (let i = 0; i < 25; i++) {
+            particles.push(new Particle(p.mouseX, p.mouseY, p.random(5, 10), p.random(150, 255), engine));
           }
         };
 
@@ -142,6 +185,24 @@ export function Game({ playerName, gameId, specs, serverUrl, onExit, onError, on
 
         const scaleX = p.width;
         const scaleY = p.height;
+
+         // Sync paddle positions
+      MatterBody.setPosition(leftPaddle, {
+        x: p.width * specs.paddle.collision_bounds.left,
+        y: state.paddles.left * scaleY,
+      });
+
+      MatterBody.setPosition(rightPaddle, {
+        x: p.width * specs.paddle.collision_bounds.right,
+        y: state.paddles.right * scaleY,
+      });
+
+      // Sync ball position
+      MatterBody.setPosition(ballBody, {
+        x: state.ball.x * scaleX,
+        y: state.ball.y * scaleY,
+      });
+
       
         // Draw center line
         p.stroke(255, 255, 255, 100);

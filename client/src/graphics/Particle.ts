@@ -6,11 +6,15 @@ class Particle {
   body: Body;
   radius: number;
   lifetime: number;
+  fillRed: number;
+  fillGreen: number;
+  fillBlue: number;
 
   constructor(
     x: number,
     y: number,
     radius: number,
+    lifetime: number,
     engine: Engine, // Pass the engine here
     options: IBodyDefinition = {}
   ) {
@@ -30,8 +34,11 @@ class Particle {
     World.add(engine.world, this.body);
 
     // Store properties for rendering
+    this.fillRed = Math.floor(Math.random() * 255)
+    this.fillGreen = Math.floor(Math.random() * 255)
+    this.fillBlue = Math.floor(Math.random() * 255)
     this.radius = radius;
-    this.lifetime = 255; // Fade-out effect
+    this.lifetime = lifetime; // Fade-out effect
   }
 
   // Update particle position and state
@@ -57,7 +64,7 @@ class Particle {
     p.rotate(angle);
 
     // Set fill color with fading alpha
-    p.fill(255, 150, 0, this.lifetime);
+    p.fill(this.fillRed, this.fillGreen, this.fillBlue, this.lifetime);
     p.noStroke();
     p.ellipse(0, 0, this.radius * 2);
 
