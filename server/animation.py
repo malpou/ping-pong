@@ -49,7 +49,7 @@ dt = 1/120 # frames / second
 
 game = Game()
 game.player_count = 2
-game.state = Game.State.PLAYING
+game.state = Game.state.PLAYING
 
 # show the animation
 show_animation(game, dt)

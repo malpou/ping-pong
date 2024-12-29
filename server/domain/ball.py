@@ -20,15 +20,18 @@ class Ball:
     def set_speed(self, new_speed: float) -> None:
         self.speed = new_speed
 
+    def normalize_angle(self, angle) -> float:
+        return np.mod(angle, 2 * np.pi)
+
     def update_position(self) -> None:
         self.x, self.y = self.calc_pos()
 
         # Bounce off top and bottom
         if (
-                ((self.y <= self.radius) and (np.pi <= np.mod(self.angle, 2 * np.pi) <= 2 * np.pi)) or
-                ((self.y >= 1 - self.radius) and (0 <= np.mod(self.angle, 2 * np.pi) <= np.pi))
+                ((self.y <= self.radius) and (np.pi <= self.angle <= 2 * np.pi)) or
+                ((self.y >= 1 - self.radius) and (0 <= self.angle <= np.pi))
         ):
-            self.angle = -self.angle
+            self.angle = self.normalize_angle(-self.angle)
 
     def calc_pos(self):
         v_x = self.speed * np.cos(self.angle)
