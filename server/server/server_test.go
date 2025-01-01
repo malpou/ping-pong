@@ -115,13 +115,13 @@ func TestClientCanMovePaddleInGame(t *testing.T) {
 
 	SendMessage(t, conn, protocol.Message{
 		Type: protocol.MovePaddle,
-		Data: "U",
+		Data: "up",
 	})
 
 	response := ReadMessage(t, conn, "create_room_response")
 	expectedMessage := protocol.Message{
 		Type: protocol.MovePaddleResponse,
-		Data: "U",
+		Data: "up",
 	}
 	assert.Equal(t, expectedMessage, response)
 }

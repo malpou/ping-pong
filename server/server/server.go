@@ -156,7 +156,7 @@ func (c *Client) HandleMovePaddle(direction game.Direction) {
 
 	response := protocol.Message{
 		Type: protocol.MovePaddleResponse,
-		Data: string(direction),
+		Data: direction.String(),
 	}
 	c.Send(response)
 }

@@ -66,6 +66,6 @@ func (b *Ball) Reset(direction Side) {
 		b.SetDirection(direction)
 	} else {
 		// Handle the case for random first serve if needed
-		b.SetDirection("")
+		b.SetDirection(None)
 	}
 }

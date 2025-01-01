@@ -88,19 +88,22 @@ func ParseMessage(client ClientActions, rawMessage []byte) {
 	case CreateRoom:
 		client.HandleCreateRoom()
 	case MovePaddle:
-		if direction, ok := message.Data.(string); ok && len(direction) > 0 {
-			switch game.Direction(direction[0]) {
-			case game.Up, game.Down:
-				client.HandleMovePaddle(game.Direction(direction[0]))
+		if direction, ok := message.Data.(string); ok {
+			switch direction {
+			case "up":
+				client.HandleMovePaddle(game.Up)
+			case "down":
+				client.HandleMovePaddle(game.Down)
 			default:
 				errorMessage.Data = "Invalid move_paddle direction"
 				client.Send(errorMessage)
+				return
 			}
 		} else {
 			errorMessage.Data = "Invalid move_paddle data"
 			client.Send(errorMessage)
+			return
 		}
-
 	default:
 		log.Println("Unknown message type:", message.Type)
 	}

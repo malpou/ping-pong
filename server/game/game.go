@@ -5,27 +5,6 @@ import (
 	"time"
 )
 
-type State string
-type Side string
-type Direction byte
-
-const (
-	Waiting  State = "waiting"
-	Playing  State = "playing"
-	Paused   State = "paused"
-	GameOver State = "game_over"
-)
-
-const (
-	Left  Side = "left"
-	Right Side = "right"
-)
-
-const (
-	Up   Direction = 'U'
-	Down Direction = 'D'
-)
-
 const (
 	PointsToWin        = 5
 	Size               = 1.0
@@ -65,7 +44,7 @@ func NewGame() *Game {
 }
 
 func (g *Game) Update() {
-	if g.Winner != "" || g.State != Playing || g.PlayerCount < 2 {
+	if g.Winner != None || g.State != Playing || g.PlayerCount < 2 {
 		return
 	}
 
@@ -77,10 +56,10 @@ func (g *Game) Update() {
 		return
 	}
 
-	if g.ScoringSide != "" {
+	if g.ScoringSide != None {
 		if time.Since(g.ScoreTimer).Seconds() >= ScoreDelay {
 			g.Ball.Reset(g.ScoringSide)
-			g.ScoringSide = ""
+			g.ScoringSide = None
 		}
 		return
 	}
@@ -142,7 +121,7 @@ func (g *Game) MovePaddle(side Side, direction Direction) {
 		} else if direction == Down {
 			g.LeftPaddle.MoveDown()
 		}
-	case "right":
+	case Right:
 		if direction == Up {
 			g.RightPaddle.MoveUp()
 		} else if direction == Down {

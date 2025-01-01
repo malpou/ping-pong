@@ -1,9 +1,10 @@
 package game
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewBall(t *testing.T) {
@@ -70,7 +71,7 @@ func TestBallSetDirection(t *testing.T) {
 	ball.SetDirection(Right)
 	assert.Equal(t, 0.0, ball.Angle, "Ball angle should be set to 0 when direction is right")
 
-	ball.SetDirection("")
+	ball.SetDirection(None)
 	assert.True(t, ball.Angle == 0 || ball.Angle == math.Pi, "Ball angle should be randomly set to 0 or Pi")
 }
 

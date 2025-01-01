@@ -180,10 +180,8 @@ func TestScoringViaUpdate(t *testing.T) {
 	game.AddPlayer()
 	game.StartTimer = time.Now().Add(-StartDelay * time.Second)
 
-	for game.Starting {
-		game.Update()
-		time.Sleep(10 * time.Millisecond) // Small delay to simulate game loop
-	}
+	game.Update()
+	game.Update()
 
 	// Simulate ball crossing the left boundary
 	game.Ball.X = -0.1
